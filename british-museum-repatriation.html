@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>If All Artifacts Returned Home</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f5f0e6;
+    color: #2c2416;
+    overflow: hidden;
+    height: 100vh;
+  }
+  
+  .app {
+    display: flex;
+    height: 100vh;
+  }
+  
+  /* Sidebar */
+  .sidebar {
+    width: 380px;
+    background: #eae3d1;
+    border-right: 1px solid #d4c9b0;
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+  }
+  
+  .sidebar-header {
+    padding: 24px;
+    border-bottom: 1px solid #d4c9b0;
+    background: #f0e8d5;
+  }
+  
+  .sidebar-header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1510;
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+  }
+  
+  .sidebar-header p {
+    font-size: 12px;
+    color: #6b5d4a;
+    line-height: 1.4;
+  }
+  
+  .stats {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    font-size: 11px;
+    color: #5a4d3a;
+  }
+  
+  .stat {
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid #d4c9b0;
+  }
+  
+  .stat strong {
+    color: #1a1510;
+    font-size: 13px;
+  }
+  
+  .search-bar {
+    padding: 12px 16px;
+    border-bottom: 1px solid #d4c9b0;
+  }
+  
+  .search-bar input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #c4b8a0;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  
+  .search-bar input:focus {
+    border-color: #8b7355;
+  }
+  
+  .selection-toolbar {
+    padding: 10px 16px;
+    border-bottom: 1px solid #d4c9b0;
+    background: #f0e8d5;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  .selection-toolbar button {
+    background: #fff;
+    border: 1px solid #c4b8a0;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    color: #2c2416;
+  }
+  
+  .selection-toolbar button:hover {
+    background: #f5f0e6;
+  }
+  
+  .selection-toolbar button.primary {
+    background: #2c2416;
+    color: #f5f0e6;
+    border-color: #2c2416;
+  }
+  
+  .selection-toolbar button.primary:hover {
+    background: #4a3c28;
+  }
+  
+  .selection-count {
+    font-size: 11px;
+    color: #5a4d3a;
+    margin-left: auto;
+  }
+  
+  .filters {
+    padding: 12px 16px;
+    border-bottom: 1px solid #d4c9b0;
+  }
+  
+  .filter-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #5a4d3a;
+    margin-bottom: 6px;
+  }
+  
+  .filter-row input {
+    width: 80px;
+    padding: 4px 8px;
+    border: 1px solid #c4b8a0;
+    border-radius: 4px;
+    font-size: 11px;
+    background: #fff;
+  }
+  
+  .artifact-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  
+  /* macOS Finder-style selection */
+  .artifact-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #e0d7c3;
+    transition: background 0.15s;
+    align-items: center;
+    user-select: none;
+  }
+  
+  .artifact-item:hover {
+    background: #f0e8d5;
+  }
+  
+  .artifact-item.selected {
+    background: #c9d8f5;
+    border-left: 3px solid #007aff;
+  }
+  
+  .artifact-item.in-transit {
+    opacity: 0.5;
+  }
+  
+  .artifact-item.returned {
+    background: #e8f5e9;
+  }
+  
+  .artifact-item.returned.selected {
+    background: #c9d8f5;
+  }
+  
+  .artifact-checkbox {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid #999;
+    border-radius: 3px;
+    background: #fff;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #fff;
+    transition: all 0.1s;
+  }
+  
+  .artifact-item.selected .artifact-checkbox {
+    background: #007aff;
+    border-color: #007aff;
+  }
+  
+  .artifact-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #c4b8a0;
+  }
+    
+  .artifact-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  
+  .artifact-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .artifact-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a1510;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .artifact-origin {
+    font-size: 11px;
+    color: #6b5d4a;
+    margin-bottom: 1px;
+  }
+  
+  .artifact-date {
+    font-size: 10px;
+    color: #8b7d68;
+  }
+  
+  /* Map */
+  .map-container {
+    flex: 1;
+    position: relative;
+  }
+  
+  #map {
+    width: 100%;
+    height: 100%;
+    background: #e8e0d0;
+  }
+  
+  /* Custom Leaflet styles */
+  .artifact-marker {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #8b4513;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .artifact-marker:hover {
+    transform: scale(1.2);
+    background: #a0522d;
+  }
+  
+  .artifact-marker.london {
+    background: #d32f2f;
+    border-color: #fff;
+  }
+  .artifact-marker.london.selected {
+    background: #d32f2f;
+    border-color: #007aff;
+    border-width: 4px;
+  }
+  
+  .artifact-marker.home {
+    background: #2e7d32;
+    border-color: #fff;
+  }
+  .artifact-marker.home.selected {
+    background: #2e7d32;
+    border-color: #007aff;
+    border-width: 4px;
+  }
+  
+  .artifact-marker.between {
+    background: #f57c00;
+    border-color: #fff;
+  }
+  
+  /* Controls */
+  .controls {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    background: rgba(255,255,255,0.95);
+    padding: 14px 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    backdrop-filter: blur(8px);
+    border: 1px solid #d4c9b0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .controls button {
+    background: #2c2416;
+    color: #f5f0e6;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .controls button:hover:not(:disabled) {
+    background: #4a3c28;
+  }
+  
+  .controls button:disabled {
+    background: #b8a990;
+    cursor: not-allowed;
+  }
+  
+  .controls button.secondary {
+    background: #fff;
+    color: #2c2416;
+    border: 1px solid #d4c9b0;
+  }
+  
+  .controls button.secondary:hover:not(:disabled) {
+    background: #f5f0e6;
+  }
+  
+  .controls button.accent {
+    background: #007aff;
+    color: #fff;
+    border-color: #007aff;
+  }
+  
+  .controls button.accent:hover:not(:disabled) {
+    background: #005ecb;
+  }
+  
+  .legend {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 999;
+    background: rgba(255,255,255,0.9);
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #d4c9b0;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  
+  .dot-london { background: #d32f2f; }
+  .dot-home { background: #2e7d32; }
+  .dot-between { background: #f57c00; }
+  .dot-selected { background: #007aff; }
+  
+  .instructions {
+    position: absolute;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    pointer-events: none;
+    opacity: 0.9;
+  }
+  
+  /* Popup */
+  .artifact-popup {
+    font-family: inherit;
+    max-width: 280px;
+  }
+  
+  .popup-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #1a1510;
+  }
+  
+  .popup-meta {
+    font-size: 12px;
+    color: #6b5d4a;
+    line-height: 1.5;
+  }
+  
+  .popup-image {
+    width: 100%;
+    height: 100px;
+    background: #e0d7c3;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+  }
+</style>
+</head>
+<body>
+<div id="version-banner" style="position:sticky;top:0;z-index:50;background:#fffbe6;color:#5c4b1f;font:600 13px/1.4 system-ui;padding:6px 12px;border-bottom:1px solid #fde58a;text-align:center">Repatriation Map · BM dataset loaded · 204 artifacts · v2026-06-02</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>🏛️ If All Artifacts Returned Home</h1>
+      <p>An interactive map tracing the origins of British Museum objects taken from 99 countries.</p>
+      <div class="stats">
+        <div class="stat"><strong id="totalCount">0</strong> in list</div>
+        <div class="stat"><strong id="selectedCount">0</strong> selected</div>
+        <div class="stat"><strong id="returnedCount">0</strong> returned</div>
+      </div>
+    </div>
+    
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search artifacts, countries...">
+    </div>
+    
+    <div class="selection-toolbar">
+      <button onclick="selectAllVisible()">Select All</button>
+      <button onclick="clearSelection()">Clear</button>
+      <span class="selection-count" id="selectionHint">Click artifacts to select</span>
+    </div>
+    
+    <div class="filters">
+      <div class="filter-row">
+        <span>Date Range</span>
+        <span>
+          <input type="number" id="yearFrom" value="-4000" step="100"> —
+          <input type="number" id="yearTo" value="1900" step="100">
+        </span>
+      </div>
+    </div>
+    
+    <div class="artifact-list" id="artifactList"></div>
+  </div>
+  
+  <div class="map-container">
+    <div id="map"></div>
+    
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot dot-london"></div> In British Museum</div>
+      <div class="legend-item"><div class="legend-dot dot-home"></div> Returned home</div>
+      <div class="legend-item"><div class="legend-dot dot-selected"></div> Selected (Cmd-click)</div>
+    </div>
+    
+    <div class="instructions" id="instructions">Click to select · Cmd/Ctrl+Click to multi-select · Shift+Click for range</div>
+    
+    <div class="controls">
+      <button id="sendHomeBtn" class="accent">🏠 Send Selected Home</button>
+      <button id="sendAllBtn">↗ Send ALL Home</button>
+      <button id="resetBtn" class="secondary">↩ Reset to Museum</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ARTIFACTS = [
+{ id: 'GR_1816-0714-1', name: 'Elgin Marbles', origin: 'Greece', lat: 37.97, lng: 23.72, year: null, date_text: '', material: 'Pentelic marble', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Elgin-marbles-jan-2024.jpg/330px-Elgin-marbles-jan-2024.jpg' },
+{ id: 'Y_EA24', name: 'Rosetta Stone', origin: 'Egypt: Beheira, el- (Governorate): Rashid, el-: Fort Saint Julien', lat: 31.2, lng: 30.0, year: null, date_text: 'Ptolemaic', material: 'granodiorite', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/30_14/850117f8_773c_4b7e_af44_a3b600f6de6d/mid_00016456_004.jpg' },
+{ id: 'Am1923-3', name: 'Benin Bronzes', origin: 'Nigeria', lat: 6.4, lng: 5.6, year: null, date_text: '16thC-17thC', material: 'brass', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Benin_brass_plaque_03_British_Museum.jpg/330px-Benin_brass_plaque_03_British_Museum.jpg' },
+{ id: 'W_1928-1009-378', name: 'game-board', origin: 'Middle East: Iraq: Iraq, South: Royal Cemetery (Ur)', lat: -27.1, lng: -109.3, year: null, date_text: 'Early Dynastic III', material: 'wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/9_18/4a17e464_094e_448c_ba94_a3de013301d7/mid_01460257_001.jpg' },
+{ id: 'Y_EA4947', name: 'amphora', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'pottery', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/9_7/a25c2a5f_82d5_49c8_b91b_a3bf00821735/mid_00488785_001.jpg' },
+{ id: 'Y_EA10731', name: 'papyrus; amulet (?)', origin: ' Thebes (historic - Upper Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2016_9/9_15/45b20925_7078_4548_9aef_a67c0103d2e8/mid_EA_10731rto.jpg' },
+{ id: 'Y_EA41077', name: 'anatomical votive', origin: 'Deir el-Bahri, Thebes, Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2026_4/1_13/cb61b535_f89d_43fe_ac17_b41f00da6a63/mid_EA41078.jpg' },
+{ id: 'Y_EA1000', name: 'base', origin: 'Amarna, Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '18th Dynasty', material: 'granite', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/1_6/24cfc18c_76b8_4ba3_b3a8_a3b7006f71f6/mid_00033229_001.jpg' },
+{ id: 'G_1882-1110-1', name: 'block', origin: ' Salamis (historic - Cyprus)', lat: 35.1, lng: 33.4, year: null, date_text: 'Hellenistic', material: 'marble', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/13_15/4a4eb63a_4324_4239_bf91_a3c300fcb073/mid_00809520_001.jpg' },
+{ id: 'Y_EA194', name: 'block', origin: 'Egypt: Uqsur, el- (Governorate): Karnak (Thebes): Temple of Amun', lat: 26.8, lng: 30.8, year: null, date_text: '20th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/1_6/02f105ef_6a41_4bc2_9cf3_a3b7006ed913/mid_00033107_001.jpg' },
+{ id: 'Y_EA90844-abc', name: 'cast; stela', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: 'Unknown', material: 'plaster', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_13/a5c13e51_90f2_48d4_9a8c_a3b800ee79d6/mid_00030018_001.jpg' },
+{ id: 'Y_EA46655', name: 'coffin', origin: 'Egypt: Asyut (Governorate): Asyut (town)', lat: 26.8, lng: 30.8, year: null, date_text: '11th Dynasty', material: 'wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2019_6/4_11/d2b0894d_ab9b_463a_8851_aa6200bcd8d0/mid_EA46655.jpg' },
+{ id: 'Y_EA30360', name: 'coffin', origin: ' Thebes (historic - Upper Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: '25th Dynasty', material: 'wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/13_20/1c46147c_eef0_473e_b1eb_a3c301581011/mid_00835847_001.jpg' },
+{ id: 'Y_EA85841', name: 'digital chip', origin: 'Japan: Honshu: Tokyo-to', lat: 36.2, lng: 138.2, year: null, date_text: 'Heisei Era', material: 'glass (fused silica plate)', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2025_5/30_14/098f0be1_ac40_43e5_b49a_b2ed00edec84/mid_PO15199_YCA84758_.jpg' },
+{ id: 'Y_EA41643', name: 'door-plate', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '18th Dynasty', material: 'bronze', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_13/01ac7666_102f_4d3f_bb64_a3ba00da6490/mid_00231238_001.jpg' },
+{ id: 'A_2009-3020-2', name: 'drawing; manga', origin: 'British Isles: England: London (England): Camden, London Borough of: Bloomsbury (Camden): British Museum', lat: 52.4, lng: -1.2, year: null, date_text: 'Heisei Era', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/12_19/b3fdbe37_aab7_4c00_ba0d_a3c20146e439/mid_00757484_001.jpg' },
+{ id: 'P_1862-0614-626', name: 'drawing', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1828', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/6_17/6b8685d0_569d_44a2_8cc6_a3bc011831cd/mid_00435023_001.jpg' },
+{ id: 'E_Am2001-16-13-a-b', name: 'ear-ring', origin: 'North America: USA: New Mexico (state): Santa Fe County: Santa Fe (New Mexico)', lat: 37.1, lng: -95.7, year: null, date_text: '2001', material: 'shell', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_17/37e39e9f_9322_47d5_97c1_a3b80120ccf3/00318242_001.JPG' },
+{ id: 'E_Am2001-16-14-a-b', name: 'ear-ring', origin: 'North America: USA: New Mexico (state): Rio Arriba County: Santa Clara (New Mexico)', lat: 37.1, lng: -95.7, year: null, date_text: '2001', material: 'plastic', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_17/1a83d477_fdc7_4f60_bed3_a3b80120d15f/00318244_001.JPG' },
+{ id: 'Y_EA2295', name: 'figure', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '12th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_21/bc17f1c7_868c_4e68_8707_a3b80164cb43/mid_00335990_001.jpg' },
+{ id: 'Y_EA137', name: 'figure', origin: 'Upper Egypt (historic)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'granite', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/6_14/114cc417_8daa_48fa_bc73_a3db00ea45c9/mid_01243810_001.jpg' },
+{ id: 'Y_EA47547', name: 'figure', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Late Period', material: 'bronze', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/5_22/800a354a_cf3e_4507_8de2_a3bb016f52bb/mid_00383462_001.jpg' },
+{ id: 'Y_EA2331', name: 'figure', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '18th Dynasty (late)', material: 'sycomore fig wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/10_8/563c864c_2caf_4e4c_9f7c_a3df008d5e5f/mid_01498182_001.jpg' },
+{ id: 'Y_EA13355', name: 'figure', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Ramesside', material: 'steatite', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/30_14/535b3917_ada0_4f98_becb_a3b600e9fae1/mid_00013440_001.jpg' },
+{ id: 'Y_EA41573', name: 'model group; figure', origin: 'Egypt: Minya, el- (Governorate): Beni Hasan', lat: 26.8, lng: 30.8, year: null, date_text: 'Middle Kingdom', material: 'wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_13/dfc78c9a_9e95_47bd_993b_a3ba00da6e4a/mid_00231243_001.jpg' },
+{ id: 'Y_EA41748', name: 'figure', origin: 'Egypt: Sinai: Ganub Sina (Governorate): Serabit el-Khadim', lat: 26.8, lng: 30.8, year: null, date_text: 'Middle Kingdom', material: 'sandstone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/6_11/b91fe08c_dc54_45b1_a1ae_a3db00bcdd47/mid_01232449_001.jpg' },
+{ id: 'Y_EA36298', name: 'figure', origin: 'Egypt: Aswan (Governorate): Aswan (town): Elephantine', lat: 26.8, lng: 30.8, year: null, date_text: '12th Dynasty (late)', material: 'graywacke', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/12_11/9781a080_6461_467c_8909_a3e100b88272/mid_00098704_001.jpg' },
+{ id: 'Y_EA24430', name: 'figure', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '18th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/6_10/419c1b19_81bf_45c6_817f_a3bc00a78efa/mid_00403467_001.jpg' },
+{ id: 'Y_EA35401', name: 'figure', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Ramesside (?)', material: 'steatite', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/13_6/5233fd59_2dce_4228_a39a_a3c300665a18/mid_00774562_001.jpg' },
+{ id: 'Y_EA2291', name: 'figure', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'steatite', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/8_15/5d07e200_2c25_4604_8d06_a3dd0106afaf/mid_01380548_001.jpg' },
+{ id: 'G_1917-0501-1615', name: 'finger-ring; sealstone; intaglio', origin: 'Egypt: Iskandariya, el- (Governorate): Alexandria (Egypt): Rosetta Gate', lat: 26.8, lng: 30.8, year: null, date_text: 'Hellenistic', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/29_16/5e53b2c6_e9f4_47f8_a331_a3b5010ee407/mid_00144291_001.jpg' },
+{ id: 'Y_EA24653', name: 'flask', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'pottery', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/5_4/e701fba1_88be_46f0_bda3_a3bb004f3c62/mid_00301021_001.jpg' },
+{ id: 'Y_EA47971', name: 'floor; graffito', origin: 'Temple of Mentuhotep, Deir el-Bahri, Thebes, Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '11th Dynasty', material: 'sandstone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2025_5/21_13/c71a2d0f_3543_4b3f_acd4_b2e400d6544e/mid_EA47972__1_.jpg' },
+{ id: 'Y_EA61610', name: 'funerary bed', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Biban el-Muluk (Valley of the Kings - Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2025_5/7_8/f51e0293_94ea_47a6_9e5d_b2d60083ea83/mid_YCA24255_54FF.jpg' },
+{ id: 'Y_EA47963', name: 'temple-relief; graffito', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Bahri (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: 'Middle Kingdom', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_13/f12b9414_3ac3_4d76_98bf_a3ba00d9be0e/mid_00231064_001.jpg' },
+{ id: 'Y_EA47962', name: 'temple-relief; graffito', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Bahri (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom (?)', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/11_1/c54b94d5_542b_478d_9a8f_a3c1001d9a54/mid_00586145_001.jpg' },
+{ id: 'Y_EA52883', name: 'trial-piece; graffito', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Bahri (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: '18th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/12_17/e518ac14_90dd_4b5d_b4f7_a3e1011cc853/mid_00116987_001.jpg' },
+{ id: 'Y_EA52882', name: 'trial-piece; graffito', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Bahri (Thebes): Temple of Hatshepsut', lat: 26.8, lng: 30.8, year: null, date_text: '18th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/6_13/fe314978_94fd_4188_a150_a3bc00db0e78/mid_00418471_001.jpg' },
+{ id: 'A_1991-0128-5', name: 'handkerchief', origin: 'Japan: Honshu: Kansai: Kyoto-fu: Kyoto-shi', lat: 36.2, lng: 138.2, year: null, date_text: 'Heisei Era', material: 'cotton', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2025_2/24_17/e364da85_57d1_4d73_828d_b28e0124eeb8/mid_JCR18126.jpg' },
+{ id: 'Y_EA63783', name: 'head-rest', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Medina (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/1_6/0cad2ea0_5f08_42c8_be93_a3b7006ddccb/mid_00032815_001.jpg' },
+{ id: 'A_1991-0128-3', name: 'headscarf', origin: 'Japan: Honshu: Kansai: Kyoto-fu: Kyoto-shi', lat: 36.2, lng: 138.2, year: null, date_text: 'Heisei Era', material: 'silk', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2025_2/24_17/a9726242_cde4_425c_80bc_b28e0124ec3b/mid_JCR18124.jpg' },
+{ id: 'Y_EA7925', name: 'heart-scarab', origin: ' Thebes (historic - Upper Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'feldspar', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2025_10/27_15/49e0c200_7298_4d19_81af_b38300f7f97b/mid_EA7925__2_.jpg' },
+{ id: 'A_2011-3040-2', name: 'illustrated book; manga; print', origin: 'London, England', lat: 52.4, lng: -1.2, year: null, date_text: '2011', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'http://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg' },
+{ id: 'A_2011-3040-1-1', name: 'illustrated book; manga; print', origin: 'Tokyo, Japan', lat: 36.2, lng: 138.2, year: null, date_text: 'Heisei Era', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'http://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg' },
+{ id: 'A_2011-3040-1-2', name: 'illustrated book; manga; print', origin: 'Tokyo, Japan', lat: 36.2, lng: 138.2, year: null, date_text: 'Heisei Era', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'http://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg' },
+{ id: 'Y_EA14931', name: 'tile', origin: 'Tell el-Yahudiya, Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'c. 1175-1155 BC', material: 'glazed composition', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/16_9/29bc59b5_5a5a_4800_bf93_a3c6009c7ba9/mid_00993027_001.jpg' },
+{ id: 'Y_EA13714', name: 'inlay', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Ramesside', material: 'glazed composition', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/2_12/3793e50b_b15b_40bf_bb1e_a3e000cc57d4/mid_01632731_001.jpg' },
+{ id: 'Y_EA54460', name: 'jewellery; ornament', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '12th Dynasty', material: 'electrum', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/1_6/04fa8e26_7e0e_499d_a22e_a3b700683422/mid_00031222_001.jpg' },
+{ id: 'Y_EA55586', name: 'label', origin: 'Egypt: Sohag (Governorate): Abydos', lat: 26.8, lng: 30.8, year: null, date_text: '1st Dynasty', material: 'ivory', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/11_5/4969f3f6_bb5c_41a1_a830_a3c100538da2/mid_00602401_001.jpg' },
+{ id: 'Y_EA76744', name: 'letter', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '13 September 1801', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/12_21/1de22036_7ad7_48f0_bfee_a3c2015a302a/mid_00762626_001.jpg' },
+{ id: 'Y_EA1072', name: 'temple-relief; lintel', origin: 'Egypt: Fayum, el- (Governorate): Hawara: Temple of Amenemhat III (Hawara)', lat: 26.8, lng: 30.8, year: null, date_text: '12th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/6_18/5e8eb0a4_16ef_4543_b120_a3db0132f713/mid_01263005_001.jpg' },
+{ id: 'Y_EA29547', name: 'magical brick', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'clay', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/6_11/abd97192_49a6_4927_9504_a3db00bba38d/mid_01232149_001.jpg' },
+{ id: 'C_BNK-EngM-266', name: 'medal', origin: 'British Isles', lat: 54.5, lng: -3.5, year: null, date_text: '1801', material: 'pewter', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2018_1/19_16/f3fee232_4df9_4668_8342_a86d0115ce5d/mid_GB_Societies_Awards_OFFICIAL_04151.jpg' },
+{ id: 'Y_EA12778', name: 'scribal palette; model', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Ramesside', material: 'mudstone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2026_5/19_15/19f7fde4_73ad_41e3_a8ad_b44f00fb8c97/mid_EA12778.jpg' },
+{ id: 'Y_EA35878', name: 'model; writing-box', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'First Intermediate (?)', material: 'wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/12_22/f172bd47_c87f_4408_a2bd_a3c201780f58/mid_00771869_001.jpg' },
+{ id: 'Y_EA90380', name: 'naukratic figure', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Late Period (?)', material: 'glazed composition', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/11_0/4490cfcf_0be5_44b4_ac21_a3c1000688f1/mid_00578725_001.jpg' },
+{ id: 'A_1991-0128-4', name: 'neck-tie', origin: 'Japan: Honshu: Kansai: Kyoto-fu: Kyoto-shi', lat: 36.2, lng: 138.2, year: null, date_text: 'Heisei Era', material: 'silk', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2025_2/24_17/bcaed42a_0d2c_46d7_887a_b28e0124eda8/mid_JCR18125.jpg' },
+{ id: 'W_EPH-ME-9097', name: 'print; newspaper/periodical', origin: 'London, England', lat: 52.4, lng: -1.2, year: null, date_text: '8 February 1890', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_13/a5c13e51_90f2_48d4_9a8c_a3b800ee79d6/mid_00030018_001.jpg' },
+{ id: 'Y_EA695', name: 'offering-table', origin: 'Egypt: Sinai: Ganub Sina (Governorate): Serabit el-Khadim', lat: 26.8, lng: 30.8, year: null, date_text: '12th Dynasty', material: 'sandstone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/8_19/ff829845_e0c0_4871_b481_a3be013cf735/mid_00459199_001.jpg' },
+{ id: 'PA_Painting-40', name: 'oil painting', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1800 (after)', material: 'canvas', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/29_17/52c38e54_28c4_4a36_a72d_a3b50121cd38/mid_00149310_001.jpg' },
+{ id: 'Y_EA14222', name: 'ostracon', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Coptic', material: 'pottery', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/3_6/5857d134_0dd9_4ab3_af7a_a3b900724afa/mid_00347308_001.jpg' },
+{ id: 'Y_EA32782', name: 'ostracon', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Bahri (Thebes): Monastery of St Phoibammon', lat: 26.8, lng: 30.8, year: null, date_text: 'Coptic', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/29_15/d5e72357_2374_418f_a7b3_a3b5010255d1/mid_00140031_001.jpg' },
+{ id: 'Y_EA50714', name: 'ostracon', origin: ' Thebes (historic - Upper Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty (?)', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_13/f752f98d_a32f_40f6_b2a0_a3ba00dc2af3/mid_00231692_001.jpg' },
+{ id: 'Y_EA5640', name: 'ostracon', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Medina (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_18/ee625522_27ae_43be_b2ce_a3ba012ef2d4/mid_00249493_001.jpg' },
+{ id: 'Y_EA5629', name: 'ostracon', origin: ' Thebes (historic - Upper Egypt) (?)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/15_21/659451e5_9c44_42e2_82a2_a3c50162bf6a/mid_00968575_001.jpg' },
+{ id: 'Y_EA50716', name: 'ostracon', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Medina (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty (?)', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_18/d9d67c07_92a4_4f82_ad24_a3ba0130649b/mid_00250011_001.jpg' },
+{ id: 'Y_EA5634', name: 'ostracon', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Medina (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty (Year 40 of Ramses II)', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/9_13/5318d4e9_a173_47f7_9559_a3bf00d8c510/mid_00514988_001.jpg' },
+{ id: 'Y_EA41541', name: 'ostracon', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Medina (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: '20th Dynasty', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_13/9d36ec9b_12d7_4b33_8270_a3ba00dfcf23/mid_00233008_001.jpg' },
+{ id: 'Y_EA12784', name: 'scribal palette; paint-brush; paint-mixer; paint sample', origin: ' Thebes (historic - Upper Egypt) (?)', lat: 26.8, lng: 30.8, year: null, date_text: '18th Dynasty (early)', material: 'wood', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/6_10/375c3a23_2e7c_438f_8261_a3bc00b25ede/mid_00406820_001.jpg' },
+{ id: 'Y_EA5547', name: 'paint-stone; paint-grinder', origin: ' Thebes (historic - Upper Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'basalt', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/13_6/0e5b798a_8a30_4a3a_90f7_a3c30071cde5/mid_00777820_001.jpg' },
+{ id: 'Y_EA10298', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Third Intermediate', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2017_6/30_9/8867ed1f_d8c7_4f38_87f1_a7a2009ae000/mid_BM_EA10298.jpg' },
+{ id: 'Y_EA9953-B2', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/16_7/f812f83b_2ed4_491a_9f33_a3c6007521fe/mid_00981191_001.jpg' },
+{ id: 'Y_EA10303', name: 'papyrus', origin: 'Egypt, probably Thebes', lat: 26.8, lng: 30.8, year: null, date_text: 'Roman Period', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/16_16/5cfbe18f_224b_49de_ab6c_a3c6010d2bc4/mid_01026042_001.jpg' },
+{ id: 'Y_EA10202', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Third Intermediate (?)', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/8_15/17721393_e9de_4def_b986_a3be00f8a465/mid_00438609_001.jpg' },
+{ id: 'Y_EA10051-9', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Ptolemaic', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2017_11/14_9/c5962730_c003_4ecc_8742_a82b00a184f8/mid_YCA66409.jpg' },
+{ id: 'Y_EA9994-2', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '20th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/8_15/f8111bb4_169f_4536_87e6_a3be00fb7694/mid_00439471_001.jpg' },
+{ id: 'Y_EA10470-22', name: 'papyrus', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Tomb of Ani (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/11_18/5faf078c_c312_4b87_9e29_a3c1012cdade/mid_00685601_001.jpg' },
+{ id: 'Y_EA10759-3', name: 'papyrus', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Ramesseum (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: 'Middle Kingdom', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/1_5/e8edc8b1_611c_4ffc_996e_a3d6005fa028/mid_01062140_001.jpg' },
+{ id: 'Y_EA10018-2', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Third Intermediate', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/4_14/4426c709_7eed_474e_9e3c_a3d900eee871/mid_01162559_001.jpg' },
+{ id: 'Y_EA10016-2', name: 'papyrus', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Medina (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: 'Ramesside', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/1_5/7c8504af_4240_4134_beaf_a3d60054aa14/mid_01058479_001.jpg' },
+{ id: 'Y_EA10808', name: 'papyrus', origin: ' Oxyrhynchus (historic - city)', lat: 20.0, lng: 20.0, year: null, date_text: 'Roman Period', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/13_22/c474f862_178a_4571_b6a4_a3c3016fba17/mid_00841628_001.jpg' },
+{ id: 'Y_EA9901-8', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/13_16/8497a202_8caf_4708_a832_a3c30112ebd9/mid_00815849_001.jpg' },
+{ id: 'Y_EA9953-B1', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Ramesside', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/16_7/f812f83b_2ed4_491a_9f33_a3c6007521fe/mid_00981191_001.jpg' },
+{ id: 'Y_EA10061', name: 'papyrus', origin: 'Egypt: Asyut (Governorate): Asyut (town)', lat: 26.8, lng: 30.8, year: null, date_text: '20th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/29_19/1cc00035_eb66_4aae_a0e9_a3b5013dd9e8/mid_00158564_001.jpg' },
+{ id: 'Y_EA10182-1', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/6_15/e65c8dff_ea50_4392_9beb_a3bc0104a0e2/mid_00428893_001.jpg' },
+{ id: 'Y_EA10113', name: 'papyrus', origin: ' Thebes (historic - Upper Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: '26th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/3_7/d258e1f1_e881_428b_b167_a3b9007438fd/mid_00347802_001.jpg' },
+{ id: 'Y_EA10051-4', name: 'papyrus', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Ptolemaic', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/29_19/a4fee748_9f26_4359_81cf_a3b5013e5497/mid_00158726_001.jpg' },
+{ id: 'Y_EA10016-1', name: 'papyrus', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Medina (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: 'Ramesside', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/1_5/4a8d804e_76a8_4424_b445_a3d600549c0a/mid_01058476_001.jpg' },
+{ id: 'Y_EA10735-10', name: 'papyrus', origin: 'Egypt: Giza (Governorate): Abusir (Memphis): Pyramid of Kakai', lat: 26.8, lng: 30.8, year: null, date_text: '5th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/5_8/c3ba7b9b_c38d_4204_8b5f_a3da008dbc97/mid_01132155_001.jpg' },
+{ id: 'Y_EA10284', name: 'papyrus', origin: ' Thebes (historic - Upper Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: '20th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/16_13/55fc9a67_7150_4229_bb97_a3c600e521cd/mid_01015025_001.jpg' },
+{ id: 'Y_EA10183-10', name: 'papyrus', origin: ' Memphis (historic - Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/8_14/8f11f3d4_17db_4052_9d76_a3be00f6f0dd/mid_00438139_001.jpg' },
+{ id: 'Y_EA10683-3', name: 'papyrus', origin: 'Egypt: Qena (Governorate): Luxor West Bank (Thebes): Deir el-Medina (Thebes)', lat: 26.8, lng: 30.8, year: null, date_text: '19th Dynasty', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/1_6/776de5a7_d815_4b71_b359_a3b700694cef/mid_00031612_001.jpg' },
+{ id: 'Y_EA9994-7', name: 'papyrus', origin: ' Thebes (historic - Upper Egypt) (on internal evidence)', lat: 26.8, lng: 30.8, year: null, date_text: '20th Dynasty (late)', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/29_19/6e7583a1_13fb_4ce5_8b38_a3b5013e5730/mid_00158727_001.jpg' },
+{ id: 'Y_EA10070-2', name: 'papyrus', origin: ' Thebes (historic - Upper Egypt)', lat: 26.8, lng: 30.8, year: null, date_text: 'Roman Period', material: 'papyrus', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/15_11/67438cd5_2d0c_42b5_97b4_a3c500bbf55e/mid_00933551_001.jpg' },
+{ id: 'H_1955-1203-1', name: 'portrait bust', origin: 'Italy: Lazio: Rome (province): Rome (city)', lat: 41.9, lng: 12.5, year: null, date_text: '1834', material: 'marble', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/8_17/c832cd1f_2c21_489e_903f_a3be0126421e/mid_00451990_001.jpg' },
+{ id: 'W_EPH-ME-6714', name: 'postcard', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '20thC', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_13/a5c13e51_90f2_48d4_9a8c_a3b800ee79d6/mid_00030018_001.jpg' },
+{ id: 'W_EPH-ME-9350', name: 'print', origin: 'London, England', lat: 52.4, lng: -1.2, year: null, date_text: '26 September 1874', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_13/a5c13e51_90f2_48d4_9a8c_a3b800ee79d6/mid_00030018_001.jpg' },
+{ id: 'P_2006-U-3235', name: 'print', origin: 'British Isles: England: London (England)', lat: 52.4, lng: -1.2, year: null, date_text: '1810', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2017_6/29_10/20dc3f28_6a2f_459b_8a58_a7a100a62296/mid_ppa470482.jpg' },
+{ id: 'P_1852-1009-726', name: 'print', origin: 'British Isles: England: London (England)', lat: 52.4, lng: -1.2, year: null, date_text: '1838', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/6_12/f1c5b856_d1c3_4140_8449_a3db00c690a8/mid_01235942_001.jpg' },
+{ id: 'A_2017-3066-1', name: 'Key to the Highway (Rosetta Stone)', origin: 'Cincinnati, USA', lat: 37.1, lng: -95.7, year: null, date_text: '1995', material: 'etching, aquatint, and lithograph on paper', state: 'Shop Proof II/II', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_13/a5c13e51_90f2_48d4_9a8c_a3b800ee79d6/mid_00030018_001.jpg' },
+{ id: 'A_2017-3066-2', name: 'Key to the Highway (Rosetta Stone)', origin: 'Cincinnati, USA', lat: 37.1, lng: -95.7, year: null, date_text: '1995', material: 'etching, aquatint, and lithograph on paper', state: 'Edition 25/64', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_13/a5c13e51_90f2_48d4_9a8c_a3b800ee79d6/mid_00030018_001.jpg' },
+{ id: 'Y_EA65224', name: 'relief', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'New Kingdom', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/12_11/cf5618f3_452b_4b3e_8e2b_a3e0011b2cb3/mid_01633519_001.jpg' },
+{ id: 'Y_EA2436', name: 'relief', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Ancient Egypt', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/10_17/f8d75c6c_c4db_455a_880c_a3df01207999/mid_01529884_001.jpg' },
+{ id: 'Y_EA65453', name: 'relief; trial-piece', origin: 'Egypt', lat: 26.8, lng: 30.8, year: null, date_text: 'Old Kingdom', material: 'limestone', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2018_9/25_10/87cc6548_d4a7_4265_a1fb_a96600a903a6/mid_65454a.jpg' },
+{ id: 'G_1816-0610-321', name: 'acroterion (probably)', origin: 'Greece: Attica (Greece): Athens', lat: 20.0, lng: 20.0, year: null, date_text: 'Classical Greek', material: 'marble', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/14_13/3f35f284_52f7_4bcc_acbe_a3c400dacae8/mid_00859620_001.jpg' },
+{ id: 'P_1881-0709-440', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/ff051dd9_9276_47d5_9a14_a3c000cb5cc5/mid_00553530_001.jpg' },
+{ id: 'P_1881-0709-360', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1809', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/2_20/8fa644ae_1c08_40fd_a1df_a3b8014fe991/mid_00330337_001.jpg' },
+{ id: 'P_1881-0709-568', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/5bb54594_77fc_4e85_a7bb_a3c000cbfb78/mid_00553685_001.jpg' },
+{ id: 'P_1881-0709-375', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/deab435e_da22_4425_b883_a3c000c50b56/mid_00551460_001.jpg' },
+{ id: 'P_1881-0709-379', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/a0d2ebbd_f7a2_4e4a_89ff_a3c000c4f54e/mid_00551563_001.jpg' },
+{ id: 'P_1881-0709-420', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/8e267c68_6275_4806_8dbf_a3c000c9592f/mid_00552928_001.jpg' },
+{ id: 'P_1881-0709-390', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1813', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/38238f72_6fa2_4c1c_b473_a3c000c5bcb3/mid_00551632_001.jpg' },
+{ id: 'P_1881-0709-355', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/0b2de3de_e1f5_4fb8_b626_a3c000c753c0/mid_00552309_001.jpg' },
+{ id: 'P_1881-0709-374', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/9c4c0385_5f76_467c_996e_a3c000c51e09/mid_00551466_001.jpg' },
+{ id: 'P_1881-0709-507', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/29_16/bc15f2d8_fe50_4548_8234_a3b50110a646/mid_00144976_001.jpg' },
+{ id: 'P_1881-0709-377', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/e08a95ba_12cc_444e_80bb_a3c000c4f8e4/mid_00551454_001.jpg' },
+{ id: 'P_1881-0709-402', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/3136e95a_18d8_4460_ba62_a3c000c33a06/mid_00551102_001.jpg' },
+{ id: 'P_1881-0709-438', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/5dc30dc8_2134_476c_9d2e_a3c000cb49d4/mid_00553525_001.jpg' },
+{ id: 'P_1881-0709-450', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/0fc8eaab_8c2b_4373_8b85_a3c000cbe0a2/mid_00553573_001.jpg' },
+{ id: 'P_1881-0709-439', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/6d8b0688_28a1_4ec5_b35d_a3c000cb4e79/mid_00553526_001.jpg' },
+{ id: 'P_1881-0709-431', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/cc69ec82_8b1a_4c44_a1ad_a3c000cb2208/mid_00553514_001.jpg' },
+{ id: 'P_1881-0709-417', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/06fb0e67_b124_40ff_a01f_a3c000c3e678/mid_00551152_001.jpg' },
+{ id: 'P_1881-0709-430', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/2793bfb6_fd86_48b9_87a3_a3c000cb1a27/mid_00553512_001.jpg' },
+{ id: 'P_1881-0709-444', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/05780eed_6d20_43b1_b460_a3c000cb9aff/mid_00553549_001.jpg' },
+{ id: 'P_1881-0709-447', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/60919c04_acf2_490f_8fe3_a3c000cbc2ff/mid_00553557_001.jpg' },
+{ id: 'P_1881-0709-433', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/390d2945_981d_4f45_a424_a3c000cb2f03/mid_00553518_001.jpg' },
+{ id: 'P_1881-0709-410', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1813', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/bd374823_6b5a_4e80_89df_a3c000c3b517/mid_00551137_001.jpg' },
+{ id: 'P_1881-0709-422', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1813', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/8ddba2ee_9d0d_4bde_8ed0_a3c000c97a37/mid_00552942_001.jpg' },
+{ id: 'P_1881-0709-419', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/2abf5f56_f5c6_4cfc_9381_a3c000c93475/mid_00552916_001.jpg' },
+{ id: 'P_1881-0709-508', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/ef4a5bdd_e999_4afa_97ac_a3c000c4aeff/mid_00551320_001.jpg' },
+{ id: 'P_1881-0709-384', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/1705a777_2189_4686_98b0_a3c000c57fa9/mid_00551608_001.jpg' },
+{ id: 'P_1881-0709-351', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/6cada403_8367_4a46_8e58_a3c000c5e612/mid_00551842_001.jpg' },
+{ id: 'P_1881-0709-468', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/5621af67_34cd_4a06_a2cd_a3c000c457ab/mid_00551183_001.jpg' },
+{ id: 'P_1881-0709-445', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/0f27c88a_2640_48c0_945e_a3c000cbb305/mid_00553554_001.jpg' },
+{ id: 'P_1881-0709-348', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/9_7/065304f6_c730_4370_969b_a3bf00821d4b/mid_00488788_001.jpg' },
+{ id: 'P_1881-0709-376', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/58501d9c_2c71_4e71_86e0_a3c000c4fc58/mid_00551455_001.jpg' },
+{ id: 'P_1881-0709-359', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/f47a299e_7614_49e8_8acf_a3c000c87f16/mid_00552746_001.jpg' },
+{ id: 'P_1881-0709-496', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/85916a75_c857_4041_9546_a3c000cb7637/mid_00553537_001.jpg' },
+{ id: 'P_1881-0709-427', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/857fbe59_211e_446e_b1b1_a3c000cb2885/mid_00553473_001.jpg' },
+{ id: 'P_1881-0709-405', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/9eccf1f7_d78c_4f93_90fc_a3c000c378f7/mid_00551122_001.jpg' },
+{ id: 'P_1881-0709-423', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/332749bf_58f8_4189_932d_a3c000c9876a/mid_00552945_001.jpg' },
+{ id: 'P_1881-0709-380', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/f3a671d1_0c8d_4c17_811b_a3c000c4ff24/mid_00551568_001.jpg' },
+{ id: 'P_1881-0709-385', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/95819dda_676b_47ec_bcaf_a3c000c58772/mid_00551611_001.jpg' },
+{ id: 'P_1881-0709-446', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/654f0613_02a9_4953_a198_a3c000cba84a/mid_00553552_001.jpg' },
+{ id: 'G_2012-5004-5-18', name: 'architectural drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1800-1803', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_11/1_1/4f743c4b_6e48_41fd_a214_a3d6001a7d0e/mid_01041403_001.jpg' },
+{ id: 'P_1881-0709-421', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/47461907_777c_4f1e_ae30_a3c000c9678d/mid_00552935_001.jpg' },
+{ id: 'P_1881-0709-406', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/35005983_6b61_4bad_b0cb_a3c000c386d2/mid_00551125_001.jpg' },
+{ id: 'P_1881-0709-531', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_19/1919653b_c36a_4b32_a3b4_a3ba01434200/mid_00255901_001.jpg' },
+{ id: 'P_1881-0709-365', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/75911e27_a8ac_4aed_ae0a_a3c000c8fec8/mid_00552852_001.jpg' },
+{ id: 'P_1881-0709-432', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/b38f07d7_e887_48d7_b35f_a3c000cb2877/mid_00553516_001.jpg' },
+{ id: 'P_1881-0709-411', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/dffc88e1_3d77_439d_8ac1_a3c000c3bade/mid_00551139_001.jpg' },
+{ id: 'P_1881-0709-429', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/bccf3154_d4ab_4e4c_9142_a3c000cb331b/mid_00553476_001.jpg' },
+{ id: 'P_1881-0709-497', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/3973a1a9_219f_4e6b_ba96_a3c000cb7b19/mid_00553539_001.jpg' },
+{ id: 'P_1881-0709-407', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/e2015bde_5d06_4d03_8cf0_a3c000c38dd3/mid_00551127_001.jpg' },
+{ id: 'P_1881-0709-404', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/4ae1fa80_ef33_41b1_9c03_a3c000c36e61/mid_00551119_001.jpg' },
+{ id: 'P_1881-0709-425', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/b3f66509_8707_45c7_a80e_a3c000cb1e0c/mid_00553470_001.jpg' },
+{ id: 'P_1881-0709-396', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/74c8c228_bda1_404d_9500_a3c000c316cb/mid_00551091_001.jpg' },
+{ id: 'P_1881-0709-504', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/2b09ea6c_3492_43d0_b4ee_a3c000c4aae2/mid_00551372_001.jpg' },
+{ id: 'P_1881-0709-345', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1809', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/1_8/3c383999_65b4_4b6a_8d2d_a3b7008fb068/mid_00043400_001.jpg' },
+{ id: 'P_1881-0709-418', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/8f579599_7481_4d41_9cf8_a3c000c3ec3a/mid_00551154_001.jpg' },
+{ id: 'P_1881-0709-448', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/c5beb49f_7019_4bb8_a12d_a3c000cbd07d/mid_00553564_001.jpg' },
+{ id: 'P_1881-0709-387', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/7b84506c_70ae_430e_9c80_a3c000c59c7d/mid_00551621_001.jpg' },
+{ id: 'P_1881-0709-442', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/5c336756_0a36_48d0_8bce_a3c000cb8d61/mid_00553546_001.jpg' },
+{ id: 'P_1881-0709-449', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/d3685eb2_220f_49ac_a369_a3c000cbd409/mid_00553566_001.jpg' },
+{ id: 'P_1881-0709-499', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/76c5c1b4_530e_43c5_9a48_a3c000cb85f0/mid_00553543_001.jpg' },
+{ id: 'P_1881-0709-491', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/2c963469_ef12_4663_be0b_a3c000cac895/mid_00553271_001.jpg' },
+{ id: 'P_1881-0709-412', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/925d8e68_b3b9_4845_9d74_a3c000c3c371/mid_00551141_001.jpg' },
+{ id: 'P_1881-0709-500', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/96eb0db5_9ff8_485e_a7fe_a3c000c4daf2/mid_00551443_001.jpg' },
+{ id: 'P_1881-0709-434', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/766a3a25_452c_4c7b_972c_a3c000cb35cb/mid_00553520_001.jpg' },
+{ id: 'P_1881-0709-397', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/6321b143_549f_41a8_9394_a3c000c31c06/mid_00551093_001.jpg' },
+{ id: 'P_1881-0709-391', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/e4132154_5a96_44bb_aa60_a3c000c5c715/mid_00551635_001.jpg' },
+{ id: 'P_1881-0709-399', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_19/fa3ac0fd_a336_4c2b_8ad0_a3ba01437446/mid_00255916_001.jpg' },
+{ id: 'P_1881-0709-501', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/44a8ebca_2f71_4301_a00f_a3c000c4d61e/mid_00551441_001.jpg' },
+{ id: 'P_1881-0709-356', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/e14c6fb1_ec27_4b0d_98c3_a3c000c76ae0/mid_00552324_001.jpg' },
+{ id: 'P_1881-0709-408', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/f104d33d_212c_4b60_bc59_a3c000c394e6/mid_00551129_001.jpg' },
+{ id: 'P_1881-0709-494', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/ca189e65_3c6b_48ff_8a44_a3c000cb6493/mid_00553532_001.jpg' },
+{ id: 'P_1881-0709-426', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/db785945_ee7b_432a_a965_a3c000cb250c/mid_00553472_001.jpg' },
+{ id: 'P_1881-0709-452', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/33a44ead_6152_44f3_9415_a3c000cbecca/mid_00553579_001.jpg' },
+{ id: 'P_1881-0709-400', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/85ab304b_bf71_4b0c_b95b_a3c000c3285d/mid_00551097_001.jpg' },
+{ id: 'P_1881-0709-492', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/8de05ba5_991d_4bb9_b814_a3c000cb5428/mid_00553527_001.jpg' },
+{ id: 'P_1881-0709-388', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa, recto)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/21a07111_3a35_41c8_a36c_a3c000c5a2f1/mid_00551623_001.jpg' },
+{ id: 'P_1881-0709-372', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/d11848f5_8020_4b76_bb67_a3c000c52242/mid_00551467_001.jpg' },
+{ id: 'P_1881-0709-498', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/adf1f48a_f278_4eaa_a22d_a3c000cb808c/mid_00553541_001.jpg' },
+{ id: 'P_1881-0709-495', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/45a7579f_dfe9_4170_b498_a3c000cb6fd1/mid_00553535_001.jpg' },
+{ id: 'P_1881-0709-389', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/2779ae61_be2d_4a53_a054_a3c000c5ad58/mid_00551626_001.jpg' },
+{ id: 'P_1881-0709-403', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/b56cdff4_7e2b_47fe_81b2_a3c000c36790/mid_00551117_001.jpg' },
+{ id: 'P_1881-0709-401', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/176c2689_83a2_4108_b031_a3c000c32e16/mid_00551099_001.jpg' },
+{ id: 'P_1881-0709-493', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/d072c367_947f_4043_9313_a3c000cb59f9/mid_00553529_001.jpg' },
+{ id: 'P_1881-0709-463', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-11 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/d4f5bd29_90b4_416b_a60f_a3c000c43ad2/mid_00551176_001.jpg' },
+{ id: 'P_1881-0709-414', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1813', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_19/765d983d_29fc_4734_8158_a3ba014360b2/mid_00255909_001.jpg' },
+{ id: 'P_1881-0709-413', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1809', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/4_19/3f1b3fb7_7586_49ed_8a5f_a3ba01436bc6/mid_00255913_001.jpg' },
+{ id: 'P_1881-0709-437', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/042b24e8_e27c_407b_840b_a3c000cb453e/mid_00553524_001.jpg' },
+{ id: 'P_1881-0709-358', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/a2395177_7f2e_4d53_bc2e_a3c000c878c3/mid_00552744_001.jpg' },
+{ id: 'P_1881-0709-395', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/81ea294b_7827_4ee3_bf20_a3c000c31357/mid_00551090_001.jpg' },
+{ id: 'P_1881-0709-392', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/41548886_2147_4f56_9560_a3c000c5d719/mid_00551638_001.jpg' },
+{ id: 'P_1881-0709-383', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/fd7a9ed9_bda1_4a05_9f8e_a3c000c56fe6/mid_00551599_001.jpg' },
+{ id: 'P_1881-0709-409', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/5f7e2a1a_e155_449f_b531_a3c000c39ea0/mid_00551131_001.jpg' },
+{ id: 'P_1881-0709-453', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/f5915bee_023f_4f35_a915_a3c000cbf0d9/mid_00553580_001.jpg' },
+{ id: 'P_1881-0709-428', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/d451456f_174d_47cc_9ba5_a3c000cb2fc7/mid_00553475_001.jpg' },
+{ id: 'P_1881-0709-441', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/58913596_86e2_4826_8891_a3c000cb67cb/mid_00553533_001.jpg' },
+{ id: 'P_1881-0709-454', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/4f3dc79e_5370_4660_9d4c_a3c000cbf4cc/mid_00553581_001.jpg' },
+{ id: 'P_1881-0709-381', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/92ceb088_6105_482c_a794_a3c000c56896/mid_00551597_001.jpg' },
+{ id: 'P_1881-0709-353', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_12/4380b002_4b05_49f6_99f1_a3c000c77e9a/mid_00552290_001.jpg' },
+{ id: 'P_1881-0709-371', name: 'drawing; album', origin: 'Unknown', lat: 20.0, lng: 20.0, year: null, date_text: '1808-1811 (circa)', material: 'paper', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_10/10_11/575ccdf6_1995_4090_834c_a3c000c4d4a8/mid_00551542_001.jpg' },
+];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const LONDON = { lat: 51.5, lng: -0.1 };
+const allIds = ARTIFACTS.map(a => a.id);
+
+// State
+let markers = {};
+let map;
+let selectedIds = new Set();
+let lastClickedIndex = null;
+let returnedIds = new Set();
+let ARTIFACT_IMAGES = {};
+let ARTIFACT_IMAGES_LOADED = false;
+
+async function loadArtifactImages() {
+  if (ARTIFACT_IMAGES_LOADED) return;
+  try {
+    const resp = await fetch('./bm_final_artifacts.json');
+    if (resp.ok) {
+      const data = await resp.json();
+      data.forEach(entry => {
+        if (entry.image_url) {
+          ARTIFACT_IMAGES[entry.bm_id] = entry.image_url;
+        }
+      });
+      ARTIFACT_IMAGES_LOADED = true;
+    }
+  } catch (e) { console.warn('Image index unavailable', e); }
+}
+
+
+// Initialize map
+map = L.map('map', {
+  center: [20, 20],
+  zoom: 2,
+  minZoom: 2,
+  zoomControl: false,
+  attributionControl: false
+});
+
+// English-only label basemap
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19
+}).addTo(map);
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Custom icon
+function createIcon(type, isSelected = false) {
+  let cls = `artifact-marker ${type}`;
+  if (isSelected) cls += ' selected';
+  return L.divIcon({
+    className: '',
+    html: `<div class="${cls}">${type === 'london' ? '🏛️' : type === 'home' ? '🏠' : '📍'}</div>`,
+    iconSize: [type === 'london' && isSelected ? 26 : 22, type === 'london' && isSelected ? 26 : 22],
+    iconAnchor: [type === 'london' && isSelected ? 13 : 11, type === 'london' && isSelected ? 13 : 11]
+  });
+}
+
+// Add markers
+function addMarkers() {
+  ARTIFACTS.forEach(artifact => {
+    const isReturned = returnedIds.has(artifact.id);
+    const isSelected = selectedIds.has(artifact.id);
+    const markerType = isReturned ? 'home' : 'london';
+    const marker = L.marker(isReturned ? [artifact.lat, artifact.lng] : [LONDON.lat, LONDON.lng], { 
+      icon: createIcon(markerType, isSelected) 
+    }).addTo(map);
+    
+    marker.bindPopup(`
+      <div class="artifact-popup">
+        <div class="popup-image">
+          <img src="./images/${ARTIFACTS.indexOf(artifact) + 1}.jpg?cb=20260602" alt="${artifact.name}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;" onerror="this.onerror=null; this.src='${artifact.image_url || ''}'; this.onerror=this.onerror;">
+        </div>
+        <div class="popup-title">${artifact.name}</div>
+        <div class="popup-meta">
+        <strong>Origin:</strong> ${artifact.origin}<br>
+        <strong>Date:</strong> ${artifact.date_text || (artifact.year !== null ? (artifact.year < 0 ? Math.abs(artifact.year) + ' BC' : artifact.year + ' AD') : 'Unknown')}<br>
+        <strong>Material:</strong> ${artifact.material}
+        ${(artifact.state || artifact.description || '') ? `<br><strong>State:</strong> ${artifact.state || artifact.description}` : ''}
+        ${isSelected ? '<br><strong style="color:#007aff">Selected</strong>' : ''}
+        ${isReturned ? '<br><strong style="color:#2e7d32">Returned home</strong>' : ''}
+        </div>
+      </div>
+    `);
+    
+    markers[artifact.id] = marker;
+  });
+}
+
+// Update list item appearance
+function updateItemClass(itemEl, artifact) {
+  const isSelected = selectedIds.has(artifact.id);
+  const isReturned = returnedIds.has(artifact.id);
+  itemEl.classList.toggle('selected', isSelected);
+  itemEl.classList.toggle('returned', isReturned);
+  itemEl.classList.toggle('in-transit', isInTransit(artifact.id));
+}
+
+function isInTransit(id) {
+  // Check if marker is currently animating (between London and home)
+  const m = markers[id];
+  if (!m) return false;
+  const ll = m.getLatLng();
+  const returned = returnedIds.has(id);
+  if (!returned) {
+    const distToLondon = Math.sqrt((ll.lat - LONDON.lat)**2 + (ll.lng - LONDON.lng)**2);
+    const art = ARTIFACTS.find(a => a.id === id);
+    const distToHome = art ? Math.sqrt((ll.lat - art.lat)**2 + (ll.lng - art.lng)**2) : 999;
+    return distToLondon > 0.1 && distToHome > 0.1;
+  }
+  return false;
+}
+
+// Selection logic (macOS Finder style)
+function toggleSelect(id, index) {
+  const isCmd = event.metaKey || event.ctrlKey;
+  const isShift = event.shiftKey;
+  
+  if (isShift && lastClickedIndex !== null) {
+    // Range select
+    const start = Math.min(lastClickedIndex, index);
+    const end = Math.max(lastClickedIndex, index);
+    for (let i = start; i <= end; i++) {
+      selectedIds.add(ARTIFACTS[i].id);
+    }
+  } else if (isCmd) {
+    // Toggle single
+    if (selectedIds.has(id)) {
+      selectedIds.delete(id);
+    } else {
+      selectedIds.add(id);
+    }
+  } else {
+    // Single select (clear others)
+    if (selectedIds.size === 1 && selectedIds.has(id)) {
+      // Clicking same item again — deselect all
+      selectedIds.clear();
+    } else {
+      selectedIds.clear();
+      selectedIds.add(id);
+    }
+  }
+  
+  lastClickedIndex = index;
+  refreshSelection();
+}
+
+function selectAllVisible() {
+  const visibleIds = getVisibleArtifactIds();
+  visibleIds.forEach(a => selectedIds.add(a.id));
+  refreshSelection();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  lastClickedIndex = null;
+  refreshSelection();
+}
+
+function getVisibleArtifactIds() {
+  const filterText = document.getElementById('searchInput').value.toLowerCase();
+  const yearFrom = parseInt(document.getElementById('yearFrom').value) || -4000;
+  const yearTo = parseInt(document.getElementById('yearTo').value) || 1900;
+  
+  return ARTIFACTS.filter(a => {
+    const matchesText = !filterText || 
+      a.name.toLowerCase().includes(filterText) ||
+      a.origin.toLowerCase().includes(filterText);
+    const matchesYear = a.year >= yearFrom && a.year <= yearTo;
+    return matchesText && matchesYear;
+  });
+}
+
+function refreshSelection() {
+  // Update list UI
+  document.querySelectorAll('.artifact-item').forEach(el => {
+    const id = el.dataset.id;
+    const art = ARTIFACTS.find(a => a.id === id);
+    if (art) updateItemClass(el, art);
+  });
+  
+  // Update markers — show selected marker style
+  allIds.forEach(id => {
+    const isSelected = selectedIds.has(id);
+    const isReturned = returnedIds.has(id);
+    const art = ARTIFACTS.find(a => a.id === id);
+    const type = isReturned ? 'home' : 'london';
+    markers[id].setIcon(createIcon(type, isSelected && !isReturned));
+  });
+  
+  // Update selection toolbar
+  const count = selectedIds.size;
+  const countEl = document.getElementById('selectedCount');
+  const hintEl = document.getElementById('selectionHint');
+  
+  if (countEl) {
+    countEl.textContent = count;
+  }
+  if (hintEl) {
+    hintEl.textContent = count === 0 
+      ? 'Click artifacts to select' 
+      : `${count} selected — Shift+Click to range, Cmd+Click to toggle`;
+  }
+  
+  // Update buttons
+  updateButtons();
+}
+
+function updateButtons() {
+  const hasSelection = selectedIds.size > 0;
+  document.getElementById('sendHomeBtn').disabled = !hasSelection;
+  document.getElementById('resetBtn').disabled = returnedIds.size === 0;
+}
+
+// Send selected artifacts home
+function sendSelectedHome() {
+  if (selectedIds.size === 0) return;
+  
+  const btn = document.getElementById('sendHomeBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  
+  // 1) Reset everything back to the museum first
+  returnedIds.clear();
+  ARTIFACTS.forEach(artifact => {
+    markers[artifact.id].setLatLng([LONDON.lat, LONDON.lng]);
+    markers[artifact.id].setIcon(createIcon('london', selectedIds.has(artifact.id)));
+  });
+  updateStats();
+  
+  // 2) Then animate only the currently selected artifacts home
+  const ids = Array.from(selectedIds);
+  
+  ids.forEach((id, index) => {
+    const art = ARTIFACTS.find(a => a.id === id);
+    if (!art) return;
+    
+    setTimeout(() => {
+      const marker = markers[id];
+      const startPos = [LONDON.lat, LONDON.lng];
+      const endPos = [art.lat, art.lng];
+      let progress = 0;
+      const duration = 1200;
+      const startTime = Date.now();
+      
+      function animate() {
+        progress = Math.min(1, (Date.now() - startTime) / duration);
+        const eased = 0.5 - 0.5 * Math.cos(progress * Math.PI);
+        const lat = startPos[0] + (endPos[0] - startPos[0]) * eased;
+        const lng = startPos[1] + (endPos[1] - startPos[1]) * eased;
+        marker.setLatLng([lat, lng]);
+        marker.setIcon(createIcon('between', true));
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          returnedIds.add(id);
+          marker.setIcon(createIcon('home', false));
+          updateStats();
+          refreshSelection();
+        }
+      }
+      animate();
+    }, index * 200);
+  });
+  
+  setTimeout(() => {
+    btn.disabled = selectedIds.size === 0;
+    btn.textContent = '🏠 Send Selected Home';
+  }, ids.length * 200 + 1400);
+}
+
+// Send ALL home
+function sendAllHome() {
+  selectedIds.clear();
+  ARTIFACTS.forEach(a => selectedIds.add(a.id));
+  sendSelectedHome();
+}
+
+// Reset
+function resetToMuseum() {
+  returnedIds.clear();
+  selectedIds.clear();
+  ARTIFACTS.forEach(artifact => {
+    markers[artifact.id].setLatLng([LONDON.lat, LONDON.lng]);
+    markers[artifact.id].setIcon(createIcon('london', false));
+  });
+  refreshSelection();
+  updateStats();
+}
+
+// Update stats
+function updateStats() {
+  document.getElementById('totalCount').textContent = ARTIFACTS.length;
+  document.getElementById('returnedCount').textContent = returnedIds.size;
+}
+
+// Render sidebar list
+function renderList(filterText = '', yearFrom = -4000, yearTo = 1900) {
+ const list = document.getElementById('artifactList');
+ list.innerHTML = '';
+
+ const visible = ARTIFACTS.filter(a => {
+ const matchesText = !filterText || 
+ a.name.toLowerCase().includes(filterText.toLowerCase()) ||
+ a.origin.toLowerCase().includes(filterText.toLowerCase()) ||
+ (a.material || '').toLowerCase().includes(filterText.toLowerCase()) ||
+ (a.state || '').toLowerCase().includes(filterText.toLowerCase());
+ const matchesYear = a.year >= yearFrom && a.year <= yearTo;
+ return matchesText && matchesYear;
+ });
+  
+  // Reset shift-range anchor to first visible item after filter/search/reset
+  lastClickedIndex = visible.length > 0 ? parseInt(ARTIFACTS.findIndex(a => a.id === visible[0].id)) : null;
+  
+  visible.forEach((artifact, index) => {
+    const item = document.createElement('div');
+    const isSelected = selectedIds.has(artifact.id);
+    const isReturned = returnedIds.has(artifact.id);
+    const isInTrans = isInTransit(artifact.id);
+    
+    item.className = 'artifact-item';
+    if (isSelected) item.classList.add('selected');
+    if (isReturned) item.classList.add('returned');
+    if (isInTrans) item.classList.add('in-transit');
+    
+    item.dataset.id = artifact.id;
+    item.dataset.index = ARTIFACTS.findIndex(a => a.id === artifact.id);
+    
+    item.innerHTML = `
+    <div class="artifact-checkbox">${isSelected ? '✓' : ''}</div>
+    <div class="artifact-thumb">
+      <img src="./images/${ARTIFACTS.indexOf(artifact) + 1}.jpg?cb=20260602" alt="${artifact.name}" loading="lazy" onerror="this.onerror=null; this.src='${artifact.image_url || ''}'; this.onerror=this.onerror;" style="width:100%;height:100%;object-fit:cover;display:block;">
+    </div>
+    <div class="artifact-info">
+    <div class="artifact-name">${artifact.name}</div>
+    <div class="artifact-origin">${artifact.origin}</div>
+    <div class="artifact-date">${artifact.date_text || (artifact.year !== null ? (artifact.year < 0 ? Math.abs(artifact.year) + ' BC' : artifact.year + ' AD') : 'Unknown')}</div>
+    ${(artifact.state || artifact.description || '') ? `<div class="artifact-state">${artifact.state || artifact.description}</div>` : ''}
+    </div>
+  `;
+    
+    item.onclick = (e) => {
+      e.preventDefault();
+      toggleSelect(artifact.id, parseInt(item.dataset.index));
+    };
+    
+    list.appendChild(item);
+  });
+  
+  updateButtons();
+}
+
+// Event listeners
+document.getElementById('sendHomeBtn').onclick = sendSelectedHome;
+document.getElementById('sendAllBtn').onclick = sendAllHome;
+document.getElementById('resetBtn').onclick = resetToMuseum;
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  renderList(e.target.value, yearFrom.value, yearTo.value);
+});
+
+const yearFrom = document.getElementById('yearFrom');
+const yearTo = document.getElementById('yearTo');
+
+yearFrom.addEventListener('change', (e) => {
+  renderList(document.getElementById('searchInput').value, parseInt(e.target.value)||-4000, parseInt(yearTo.value)||1900);
+});
+
+yearTo.addEventListener('change', (e) => {
+  renderList(document.getElementById('searchInput').value, parseInt(yearFrom.value)||-4000, parseInt(e.target.value)||1900);
+});
+
+// Hide instructions after first selection
+const instructionsEl = document.getElementById('instructions');
+function maybeHideInstructions() {
+  if (selectedIds.size > 0 && instructionsEl) {
+    instructionsEl.style.transition = 'opacity 0.5s';
+    instructionsEl.style.opacity = '0';
+    setTimeout(() => instructionsEl.remove(), 500);
+  }
+}
+
+// Initialize
+addMarkers();
+renderList();
+updateStats();
+loadArtifactImages();
+</script>
+
+</body>
+</html>
