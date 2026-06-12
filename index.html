@@ -1,94 +1,145 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MockupBatcher macOS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body, html, #root {
-            height: 100vh;
-            width: 100vw;
-            margin: 0;
-            padding: 0;
-            background-color: #050505;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            overflow: hidden;
-            color: #fff;
-        }
-        #boot-loader {
-            position: fixed;
-            inset: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            background: #050505;
-            transition: opacity 0.4s ease-out;
-        }
-        #error-display {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: #0a0a0a;
-            color: #ff4d4d;
-            z-index: 10001;
-            padding: 40px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            overflow: auto;
-            white-space: pre-wrap;
-        }
-        .mac-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
-        .mac-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .mac-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .mac-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
-    </style>
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.463.0?external=react",
-    "@google/genai": "https://esm.sh/@google/genai@0.2.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
-</head>
-<body>
-    <div id="boot-loader">
-        <div class="w-10 h-10 border-2 border-neutral-800 border-t-white rounded-full animate-spin mb-6"></div>
-        <div class="text-[10px] font-black uppercase tracking-[0.4em] text-neutral-500 animate-pulse">Initializing Neural Studio</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>If All Artefacts Returned Home — British Museum</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230a1020' stroke='%23e8b14a' stroke-width='2'/%3E%3Cpath d='M16 4a18 12 0 000 24M16 4a18 12 0 010 24M3 16h26' stroke='%23e8b14a' stroke-width='1' fill='none' opacity='0.6'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="A 3D globe placing ~5,000 British Museum artefacts at their true origins, with animated return-home arcs from London."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Spline+Sans+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" crossorigin src="./assets/index-M1RmVQE8.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C9Vcw34W.css">
+  </head>
+  <body>
+    <div id="app">
+      <canvas-host id="globe-host"></canvas-host>
+
+      <!-- Boot / loading veil -->
+      <div id="boot" class="boot">
+        <div class="boot-mark">◍</div>
+        <div class="boot-title">If All Artefacts Returned Home</div>
+        <div class="boot-sub" id="boot-sub">Summoning the collection…</div>
+        <div class="boot-bar"><span id="boot-bar-fill"></span></div>
+      </div>
+
+      <!-- Title plate -->
+      <header class="plate">
+        <h1>
+          <span class="plate-glyph">⟿</span> If All Artefacts <em>Returned Home</em>
+        </h1>
+        <p>
+          <strong id="stat-total">5,000</strong> British Museum objects, replanted at
+          their true origins across <strong id="stat-countries">88</strong> nations.
+          Each is a real photograph; together they redraw the map.
+        </p>
+      </header>
+
+      <!-- Control deck -->
+      <aside class="deck" id="deck">
+        <div class="deck-group">
+          <label class="deck-label" for="search">Search origin / object</label>
+          <div class="search-wrap">
+            <input
+              id="search"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="e.g. Greece, bronze, mask…"
+              list="country-list"
+            />
+            <datalist id="country-list"></datalist>
+          </div>
+        </div>
+
+        <div class="deck-group">
+          <div class="deck-row">
+            <label class="deck-label">Date range</label>
+            <span class="deck-readout" id="year-readout">—</span>
+          </div>
+          <div class="range-dual">
+            <input id="year-from" type="range" />
+            <input id="year-to" type="range" />
+          </div>
+          <label class="chk">
+            <input type="checkbox" id="undated" checked />
+            <span>Include undated</span>
+          </label>
+        </div>
+
+        <div class="deck-group toggles">
+          <button class="toggle" id="t-rotate" aria-pressed="false">
+            <span class="dot"></span> Rotate
+          </button>
+          <button class="toggle" id="t-labels" aria-pressed="false">
+            <span class="dot"></span> Labels
+          </button>
+          <button class="toggle" id="t-origins" aria-pressed="false">
+            <span class="dot"></span> Origins
+          </button>
+        </div>
+
+        <div class="deck-group">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="ghost" id="reset-view" style="flex: 2;">Reset view</button>
+            <button class="ghost" id="zoom-in" style="flex: 1; font-weight: bold; font-size: 14px; padding: 6px 0; display: flex; align-items: center; justify-content: center;" title="Zoom In">+</button>
+            <button class="ghost" id="zoom-out" style="flex: 1; font-weight: bold; font-size: 14px; padding: 6px 0; display: flex; align-items: center; justify-content: center;" title="Zoom Out">−</button>
+          </div>
+          <span class="visible-count"><strong id="stat-visible">0</strong> in view</span>
+        </div>
+
+        <div class="deck-foot">
+          <span id="fps-readout" class="fps">—</span>
+          <a class="legacy-link" href="?legacy=1">2D map →</a>
+        </div>
+      </aside>
+
+      <!-- Hover tooltip -->
+      <div id="tip" class="tip" hidden></div>
+
+      <!-- Detail panel -->
+      <section id="detail" class="detail" hidden>
+        <button class="detail-close" id="detail-close" aria-label="Close">×</button>
+        <div class="detail-img-wrap">
+          <img id="detail-img" alt="" />
+        </div>
+        <div class="detail-body">
+          <h2 id="detail-name"></h2>
+          <dl>
+            <dt>Origin</dt><dd id="detail-origin"></dd>
+            <dt>Date</dt><dd id="detail-date"></dd>
+            <dt>Material</dt><dd id="detail-material"></dd>
+            <dt>Museum no.</dt><dd id="detail-museum"></dd>
+          </dl>
+          <p class="detail-license" id="detail-license"></p>
+          <a id="detail-source" class="detail-source" target="_blank" rel="noopener">
+            View source image →
+          </a>
+        </div>
+      </section>
+
+      <!-- WebGL fallback -->
+      <div id="fallback" class="fallback" hidden>
+        <div class="fallback-card">
+          <h2>3D unavailable on this device</h2>
+          <p>Your browser lost the WebGL context or runs on low-tier graphics. The classic 2D map works everywhere.</p>
+          <a class="ghost" href="?legacy=1">Open the 2D map →</a>
+        </div>
+      </div>
+
+      <!-- Build stamp (bottom-right) — visible to verify which bundle is loaded -->
+      <div id="build-stamp" class="build-stamp" title="Build identifier — compare with the README version"></div>
     </div>
-    
-    <div id="error-display"></div>
-    <div id="root"></div>
 
-    <script type="module" src="index.tsx"></script>
-
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            const display = document.getElementById('error-display');
-            if (display) {
-                display.style.display = 'block';
-                display.innerHTML = `<h1 style="font-size: 18px; font-weight: bold; margin-bottom: 12px; color: #fff;">Kernel Panic</h1><p>${msg}</p><p style="opacity:0.5; font-size:11px; margin-top:8px;">${url}:${line}:${col}</p><pre style="margin-top: 24px; color: #777; font-size: 11px; line-height: 1.5;">${error ? error.stack : 'No stack trace available'}</pre>`;
-            }
-            const loader = document.getElementById('boot-loader');
-            if (loader) loader.style.display = 'none';
-        };
-        
-        // Failsafe: Remove loader after 4 seconds regardless of React status
-        setTimeout(() => {
-            const loader = document.getElementById('boot-loader');
-            if (loader && loader.style.opacity !== '0') {
-                loader.style.opacity = '0';
-                setTimeout(() => { if (loader && loader.parentNode) loader.remove(); }, 500);
-            }
-        }, 4000);
-    </script>
-</body>
+  </body>
 </html>
