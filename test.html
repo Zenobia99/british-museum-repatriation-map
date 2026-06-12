@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Globe diagnostics</title>
+<style>
+  body { background:#0a1020; color:#f4ead6; font:14px/1.7 monospace; padding:24px; }
+  .ok { color:#7dde8b; } .bad { color:#ff7b7b; } h1 { font-size:18px; color:#e8b14a; }
+  #cube { width:220px; height:160px; border:1px solid #444; display:block; margin:8px 0; }
+</style>
+</head>
+<body>
+<h1>Globe diagnostics — read these lines back</h1>
+<div id="log"></div>
+<script>
+  const log = (msg, ok) => {
+    const d = document.createElement('div');
+    d.className = ok === false ? 'bad' : ok === true ? 'ok' : '';
+    d.textContent = (ok === false ? '✗ ' : ok === true ? '✓ ' : '· ') + msg;
+    document.getElementById('log').appendChild(d);
+  };
+  log('UA: ' + navigator.userAgent);
+  log('Screen: ' + screen.width + 'x' + screen.height + ' @ DPR ' + devicePixelRatio);
+
+  // 1. Raw WebGL
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (!gl) { log('WebGL context: NOT AVAILABLE', false); }
+    else {
+      log('WebGL context: ' + (gl.getParameter(gl.VERSION)), true);
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      log('GPU: ' + (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)));
+      log('Max texture size: ' + gl.getParameter(gl.MAX_TEXTURE_SIZE));
+      log('Max point size: ' + gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]);
+    }
+  } catch (e) { log('WebGL test threw: ' + e.message, false); }
+
+  addEventListener('error', (e) => log('window error: ' + (e.message || e.error), false));
+  addEventListener('unhandledrejection', (e) => log('promise rejection: ' + e.reason, false));
+</script>
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+  const log = (msg, ok) => {
+    const d = document.createElement('div');
+    d.className = ok === false ? 'bad' : ok === true ? 'ok' : '';
+    d.textContent = (ok === false ? '✗ ' : ok === true ? '✓ ' : '· ') + msg;
+    document.getElementById('log').appendChild(d);
+  };
+  let THREE;
+  try {
+    THREE = await import('three');
+    log('three.js loaded from jsDelivr (r' + THREE.REVISION + ')', true);
+  } catch (e) { log('three.js CDN import FAILED: ' + e.message, false); }
+
+  if (THREE) {
+    // 2. Spinning cube
+    try {
+      const r = new THREE.WebGLRenderer({ antialias: false });
+      r.setSize(220, 160);
+      r.domElement.id = 'cube';
+      document.body.appendChild(r.domElement);
+      r.domElement.addEventListener('webglcontextlost', () => log('CUBE CONTEXT LOST', false));
+      const sc = new THREE.Scene();
+      const cam = new THREE.PerspectiveCamera(50, 220 / 160, 0.1, 100); cam.position.z = 3;
+      const cube = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshNormalMaterial());
+      sc.add(cube);
+      let frames = 0;
+      (function spin() { requestAnimationFrame(spin); cube.rotation.y += 0.02; r.render(sc, cam); if (++frames === 60) log('cube rendered 60 frames', true); })();
+      log('cube renderer created', true);
+    } catch (e) { log('cube FAILED: ' + e.message, false); }
+
+    // 3. 5,000 shader points (same technique as the globe)
+    try {
+      const r2 = new THREE.WebGLRenderer({ antialias: false });
+      r2.setSize(220, 160);
+      document.body.appendChild(r2.domElement);
+      r2.domElement.addEventListener('webglcontextlost', () => log('POINTS CONTEXT LOST', false));
+      const sc = new THREE.Scene();
+      const cam = new THREE.PerspectiveCamera(50, 220 / 160, 1, 1000); cam.position.z = 300;
+      const n = 5000, pos = new Float32Array(n * 3);
+      for (let i = 0; i < n * 3; i++) pos[i] = (Math.random() - 0.5) * 200;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const m = new THREE.ShaderMaterial({
+        uniforms: { uT: { value: 0 } },
+        vertexShader: 'uniform float uT; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = clamp(2.7 * 400.0 / -mv.z, 1.5, 46.0); gl_Position = projectionMatrix * mv; }',
+        fragmentShader: 'void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(0.91, 0.69, 0.29, 1.0); }',
+        transparent: true,
+      });
+      sc.add(new THREE.Points(g, m));
+      let frames = 0;
+      (function spin() { requestAnimationFrame(spin); sc.rotation.y += 0.01; r2.render(sc, cam); if (++frames === 60) log('5000 shader points rendered 60 frames', true); })();
+      log('points renderer created', true);
+    } catch (e) { log('points FAILED: ' + e.message, false); }
+
+    // 4. Data fetch
+    try {
+      const resp = await fetch('data/artifacts.json');
+      log('data/artifacts.json: HTTP ' + resp.status, resp.ok);
+    } catch (e) { log('data fetch FAILED: ' + e.message, false); }
+  }
+</script>
+</body>
+</html>
