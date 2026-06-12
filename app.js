@@ -14,6 +14,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as topojson from 'topojson-client';
 
+window.__appJsLoaded = true; // checked by the boot watchdog in index.html
+
 const R = 100;
 const BM = { lat: 51.5194, lng: -0.1269 };
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
@@ -76,9 +78,14 @@ function fatal(err) {
   }
 }
 
-// Surface any startup crash in the fallback card instead of a silent hang
-addEventListener('error', (e) => { if (!appStarted) fatal(e.error || e.message); });
-addEventListener('unhandledrejection', (e) => { if (!appStarted) fatal(e.reason); });
+// Surface startup crashes from OUR code in the fallback card — but ignore
+// errors from browser extensions and other scripts, which must not kill the app.
+addEventListener('error', (e) => {
+  const src = e.filename || '';
+  if (!appStarted && (src.includes('app.js') || src.includes('jsdelivr'))) {
+    fatal(e.error || e.message);
+  }
+});
 
 async function loadJSON(url, msg) {
   const r = await fetch(url);

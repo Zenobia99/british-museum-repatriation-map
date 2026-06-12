@@ -18,9 +18,18 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Spline+Sans+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./app.css?v=3" />
+    <link rel="stylesheet" href="./app.css?v=4" />
     <script>
       if (new URLSearchParams(location.search).has('legacy')) location.replace('legacy.html');
+      // Boot watchdog: if the app module never executes (e.g. a network filter
+      // blocks cdn.jsdelivr.net), say so instead of spinning forever.
+      setTimeout(function () {
+        if (!window.__appJsLoaded) {
+          var sub = document.getElementById('boot-sub');
+          if (sub) sub.textContent =
+            'Could not load the 3D engine (cdn.jsdelivr.net may be blocked by a network filter or extension).';
+        }
+      }, 15000);
     </script>
     <script type="importmap">
       {
@@ -31,7 +40,7 @@
         }
       }
     </script>
-    <script type="module" src="./app.js?v=3"></script>
+    <script type="module" src="./app.js?v=4"></script>
   </head>
   <body>
     <div id="app">
