@@ -451,6 +451,29 @@
     justify-content: center;
     font-size: 32px;
   }
+  
+  .switch-3d-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #8b7355;
+    color: #fff;
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: bold;
+    margin-top: 12px;
+    transition: background-color 0.2s, transform 0.1s;
+    border: none;
+    cursor: pointer;
+  }
+  .switch-3d-btn:hover {
+    background: #755f45;
+  }
+  .switch-3d-btn:active {
+    transform: scale(0.98);
+  }
 </style>
 </head>
 <body>
@@ -466,6 +489,9 @@
         <div class="stat"><strong id="selectedCount">0</strong> selected</div>
         <div class="stat"><strong id="returnedCount">0</strong> returned</div>
       </div>
+      <a href="index.html" class="switch-3d-btn">
+        🌐 Switch to 3D Globe Map
+      </a>
     </div>
     
     <div class="search-bar">
