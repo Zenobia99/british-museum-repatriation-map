@@ -62,9 +62,13 @@ function bootTick(msg) {
   if (msg) bootSub.textContent = msg;
 }
 
-function fatal() {
+function fatal(err) {
   $('boot').classList.add('gone');
   $('fallback').hidden = false;
+  if (err) {
+    const card = document.querySelector('.fallback-card p');
+    if (card) card.textContent = `Error: ${err.message || err}`;
+  }
 }
 
 async function loadJSON(url, msg) {
@@ -94,8 +98,8 @@ async function main() {
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
-  } catch {
-    return fatal();
+  } catch (e) {
+    return fatal(e);
   }
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.setSize(innerWidth, innerHeight);
@@ -193,8 +197,8 @@ async function main() {
   );
   scene.add(halo);
 
-  // Country borders as faint luminous lines
-  {
+  // Country borders as faint luminous lines (decorative — never fatal)
+  try {
     const mesh = topojson.mesh(world, world.objects.countries);
     const verts = [];
     const a = new THREE.Vector3();
@@ -218,6 +222,8 @@ async function main() {
         depthWrite: false,
       })
     ));
+  } catch (e) {
+    console.warn('borders skipped:', e);
   }
 
   // Starfield
@@ -743,5 +749,5 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
-  fatal();
+  fatal(err);
 });
