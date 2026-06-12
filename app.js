@@ -23,6 +23,11 @@ const GOLD = new THREE.Color('#e8b14a');
 
 const $ = (id) => document.getElementById(id);
 
+// Safe mode: reduced GPU load (no AA, DPR 1, no mipmaps, no trails).
+// Entered manually via ?safe=1 or automatically after a lost WebGL context.
+const SAFE = new URLSearchParams(location.search).has('safe');
+let appStarted = false;
+
 function latLngToV3(lat, lng, r, out = new THREE.Vector3()) {
   const phi = ((90 - lat) * Math.PI) / 180;
   const theta = ((lng + 180) * Math.PI) / 180;
@@ -71,6 +76,10 @@ function fatal(err) {
   }
 }
 
+// Surface any startup crash in the fallback card instead of a silent hang
+addEventListener('error', (e) => { if (!appStarted) fatal(e.error || e.message); });
+addEventListener('unhandledrejection', (e) => { if (!appStarted) fatal(e.reason); });
+
 async function loadJSON(url, msg) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${url}: ${r.status}`);
@@ -97,14 +106,23 @@ async function main() {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
   } catch (e) {
     return fatal(e);
   }
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(SAFE ? 1 : Math.min(devicePixelRatio || 1, 1.5));
   renderer.setSize(innerWidth, innerHeight);
   host.appendChild(renderer.domElement);
-  renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); fatal(); });
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    // Retry once in safe mode before giving up
+    if (!SAFE && !sessionStorage.getItem('bm-safe-retry')) {
+      sessionStorage.setItem('bm-safe-retry', '1');
+      location.replace(location.pathname + '?safe=1');
+      return;
+    }
+    fatal(new Error('WebGL context lost (GPU reset). Try closing other tabs or restarting the browser.'));
+  });
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#04060d');
@@ -137,8 +155,8 @@ async function main() {
   // straight to the canvas, so sampling raw sRGB keeps photos true to source.
   for (const t of atlasTex) {
     t.flipY = false;
-    t.generateMipmaps = true;
-    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.generateMipmaps = !SAFE;
+    t.minFilter = SAFE ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter;
     t.needsUpdate = true;
   }
 
@@ -195,7 +213,7 @@ async function main() {
         }`,
     })
   );
-  scene.add(halo);
+  if (!SAFE) scene.add(halo);
 
   // Country borders as faint luminous lines (decorative — never fatal)
   try {
@@ -467,10 +485,12 @@ async function main() {
         blending: extra.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       });
 
-    for (const [shift, size] of [[0.10, 0.9], [0.05, 1.3]]) {
-      const trail = new THREE.Points(g, mk(FRAG_TRAIL, shift, { size, depthWrite: false, additive: true }));
-      trail.renderOrder = 1;
-      scene.add(trail);
+    if (!SAFE) {
+      for (const [shift, size] of [[0.10, 0.9], [0.05, 1.3]]) {
+        const trail = new THREE.Points(g, mk(FRAG_TRAIL, shift, { size, depthWrite: false, additive: true }));
+        trail.renderOrder = 1;
+        scene.add(trail);
+      }
     }
     const photos = new THREE.Points(g, mk(FRAG_PHOTO, 0, { size: 2.7, depthWrite: true, additive: false }));
     photos.renderOrder = 2;
@@ -743,6 +763,7 @@ async function main() {
     if (pointer.moved) { pointer.moved = false; pick(); }
 
     renderer.render(scene, camera);
+    appStarted = true;
   }
   frame();
 }
