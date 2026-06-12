@@ -120,15 +120,37 @@ async function main() {
   renderer.setPixelRatio(SAFE ? 1 : Math.min(devicePixelRatio || 1, 1.5));
   renderer.setSize(innerWidth, innerHeight);
   host.appendChild(renderer.domElement);
+
+  // Software renderers (SwiftShader etc.) can't carry the full scene — treat as safe mode
+  let lite = SAFE;
+  try {
+    const gl = renderer.getContext();
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const gpu = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+    if (/swiftshader|software|llvmpipe/i.test(gpu)) {
+      lite = true;
+      renderer.setPixelRatio(1);
+    }
+  } catch { /* detection only */ }
+
+  // A lost context is recoverable: three.js rebuilds on restore. Never show
+  // the fallback for it — wait for restore, and only reload as a last resort.
+  let ctxLostAt = 0;
   renderer.domElement.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
-    // Retry once in safe mode before giving up
-    if (!SAFE && !sessionStorage.getItem('bm-safe-retry')) {
-      sessionStorage.setItem('bm-safe-retry', '1');
-      location.replace(location.pathname + '?safe=1');
-      return;
-    }
-    fatal(new Error('WebGL context lost (GPU reset). Try closing other tabs or restarting the browser.'));
+    ctxLostAt = performance.now();
+    bootSub.textContent = 'Graphics interrupted — recovering…';
+    $('boot').classList.remove('gone');
+    setTimeout(() => {
+      if (ctxLostAt && !SAFE && !sessionStorage.getItem('bm-safe-retry')) {
+        sessionStorage.setItem('bm-safe-retry', '1');
+        location.replace(location.pathname + '?safe=1');
+      }
+    }, 6000);
+  });
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    ctxLostAt = 0;
+    $('boot').classList.add('gone');
   });
 
   const scene = new THREE.Scene();
@@ -162,8 +184,8 @@ async function main() {
   // straight to the canvas, so sampling raw sRGB keeps photos true to source.
   for (const t of atlasTex) {
     t.flipY = false;
-    t.generateMipmaps = !SAFE;
-    t.minFilter = SAFE ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter;
+    t.generateMipmaps = !lite;
+    t.minFilter = lite ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter;
     t.needsUpdate = true;
   }
 
@@ -220,7 +242,7 @@ async function main() {
         }`,
     })
   );
-  if (!SAFE) scene.add(halo);
+  if (!lite) scene.add(halo);
 
   // Country borders as faint luminous lines (decorative — never fatal)
   try {
@@ -492,7 +514,7 @@ async function main() {
         blending: extra.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       });
 
-    if (!SAFE) {
+    if (!lite) {
       for (const [shift, size] of [[0.10, 0.9], [0.05, 1.3]]) {
         const trail = new THREE.Points(g, mk(FRAG_TRAIL, shift, { size, depthWrite: false, additive: true }));
         trail.renderOrder = 1;
