@@ -16,6 +16,9 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
+const BUILD = 'v6 — overdraw fix';
+console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
+
 const R = 100;
 const BM = { lat: 51.5194, lng: -0.1269 };
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
@@ -758,6 +761,14 @@ async function main() {
   const clock = new THREE.Clock();
   setPhase('museum');
   $('boot').classList.add('gone');
+
+  // Visible build stamp so we can confirm which version is actually live
+  const stamp = document.createElement('div');
+  stamp.textContent = BUILD;
+  stamp.style.cssText =
+    'position:fixed;bottom:6px;left:8px;z-index:40;font:11px monospace;' +
+    'color:rgba(232,177,74,.5);pointer-events:none';
+  document.body.appendChild(stamp);
 
   function frame() {
     requestAnimationFrame(frame);
