@@ -22,7 +22,7 @@ console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bo
 
 const R = 100;
 const BM = { lat: 51.5194, lng: -0.1269 };
-const BUILDING_SIZE = 11; // longest footprint dimension of the museum model, in globe units
+const BUILDING_HEIGHT = 4.5; // how tall the museum model stands, in globe units
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
 const TAKE_SECS = 14;
@@ -113,38 +113,43 @@ function loadTexture(url, msg) {
 }
 
 // Load the British Museum model (if present) and seat it on the globe at
-// Bloomsbury, base on the surface, "up" along the local normal. Fire-and-forget
-// so a missing file never blocks boot; the artefacts emanate from it either way.
+// Bloomsbury: base on the surface, "up" along the local normal. Returns
+// { group, radius, height } in globe units, or null if no file is found, so
+// the artefact pile can be sized to match. Rejection is handled by the caller.
 async function loadBuilding(scene, bmDir) {
   const loader = new GLTFLoader();
+  let model = null;
   for (const url of ['assets/british-museum.glb', 'assets/british-museum.gltf']) {
-    let gltf;
     try {
-      gltf = await loader.loadAsync(url);
-    } catch {
-      continue; // not this filename — try the next
-    }
-    const model = gltf.scene;
-    // Normalise: scale longest dimension to BUILDING_SIZE, centre on its
-    // footprint, drop its base to y = 0 (model "up" assumed +Y, glTF default).
-    let box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    model.scale.setScalar(BUILDING_SIZE / Math.max(size.x, size.y, size.z));
-    box = new THREE.Box3().setFromObject(model);
-    const c = box.getCenter(new THREE.Vector3());
-    model.position.set(-c.x, -box.min.y, -c.z);
-
-    const group = new THREE.Group();
-    group.add(model);
-    group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bmDir);
-    group.position.copy(bmDir).multiplyScalar(R);
-    group.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
-    scene.add(group);
-    console.log('[Return Them Home] museum model loaded from', url);
-    return group;
+      model = (await loader.loadAsync(url)).scene;
+      console.log('[Return Them Home] museum model loaded from', url);
+      break;
+    } catch { /* try the next filename */ }
   }
-  console.log('[Return Them Home] no museum model at assets/british-museum.glb — using marker only');
-  return null;
+  if (!model) {
+    console.log('[Return Them Home] no museum model at assets/british-museum.(glb|gltf) — marker only');
+    return null;
+  }
+
+  // The glTF already carries a node transform to Y-up (verified: loaded bbox
+  // is ~102 x 23 x 133, so Y is the vertical axis) — no extra rotation needed.
+  // Scale so the model's height becomes BUILDING_HEIGHT, centre its footprint,
+  // and drop its base to y = 0.
+  let box = new THREE.Box3().setFromObject(model);
+  let size = box.getSize(new THREE.Vector3());
+  model.scale.setScalar(BUILDING_HEIGHT / size.y);
+  box = new THREE.Box3().setFromObject(model);
+  size = box.getSize(new THREE.Vector3());
+  const c = box.getCenter(new THREE.Vector3());
+  model.position.set(-c.x, -box.min.y, -c.z);
+
+  const group = new THREE.Group();
+  group.add(model);
+  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bmDir);
+  group.position.copy(bmDir).multiplyScalar(R);
+  scene.add(group);
+
+  return { group, radius: Math.max(size.x, size.z) / 2, height: size.y };
 }
 
 /* ----------------------------------------------------------------- main */
@@ -339,23 +344,24 @@ async function main() {
     })));
   }
 
-  // Museum beacon: a thin gold pillar of light over Bloomsbury
+  // Museum beacon: a soft gold glow rising from Bloomsbury (kept short so it
+  // reads as light from the building, not a pillar through it).
   const beacon = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.35, 1.1, 26, 8, 1, true),
+    new THREE.CylinderGeometry(0.3, 1.4, 9, 8, 1, true),
     new THREE.MeshBasicMaterial({
-      color: GOLD, transparent: true, opacity: 0.5,
+      color: GOLD, transparent: true, opacity: 0.35,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     })
   );
   {
-    const base = bmDir.clone().multiplyScalar(R + 13);
+    const base = bmDir.clone().multiplyScalar(R + 4.5);
     beacon.position.copy(base);
     beacon.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bmDir);
   }
   scene.add(beacon);
 
-  // Seat the museum model at Bloomsbury (async; pops in when loaded).
-  loadBuilding(scene, bmDir);
+  // Seat the museum model at Bloomsbury; size the pile to it if it loads.
+  const building = await loadBuilding(scene, bmDir).catch(() => null);
 
   /* ------------------------------------------------ artefact geometry */
 
@@ -370,13 +376,18 @@ async function main() {
   const east = new THREE.Vector3(0, 1, 0).cross(bmDir).normalize();
   const north = bmDir.clone().cross(east).normalize();
   const tmp = new THREE.Vector3();
-  const PILE_RADIUS = BUILDING_SIZE * 0.34;
+  // Footprint and height of the swarm: match the building if it loaded.
+  const PILE_RADIUS = building ? building.radius * 0.92 : 4.5;
+  const PILE_TOP = building ? building.height * 1.25 : 5.5;
+  const PILE_FLOOR = building ? building.height * 0.15 : 0.4;
   for (let i = 0; i < N; i++) {
     const f = i / N;
     const rad = PILE_RADIUS * Math.sqrt(f);
     const ang = i * 2.39996323;
     // height rises toward the centre and varies per object, spanning the model
-    const height = BUILDING_SIZE * (0.18 + 0.7 * Math.exp(-(rad * rad) / (PILE_RADIUS * 1.2)) * rng());
+    const height = PILE_FLOOR +
+      (PILE_TOP - PILE_FLOOR) * Math.exp(-(rad * rad) / (PILE_RADIUS * PILE_RADIUS * 0.5)) *
+      (0.35 + 0.65 * rng());
     tmp.copy(bmDir)
       .multiplyScalar(R)
       .addScaledVector(east, rad * Math.cos(ang))
