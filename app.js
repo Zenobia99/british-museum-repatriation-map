@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v16 — frame building + zoom';
+const BUILD = 'v17 — exit through the entrance';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -29,6 +29,8 @@ const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axi
 const VIEW_ELEV_DEG = 26;    // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
 const VIEW_HEADING_DEG = 0;  // which side of the building to view from (aim at the entrance)
 const HERO_DIST = 15;        // camera distance from the building in the opening shot
+const EXIT_HEADING_DEG = 0;  // which face the artefacts leave by (0 = the entrance we view in the opening shot)
+const EXIT_GATE = 0.16;      // fraction of each flight spent funnelling through the doorway
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
 const TAKE_SECS = 14;
@@ -393,24 +395,16 @@ async function main() {
     })));
   }
 
-  // Museum beacon: a soft gold glow rising from Bloomsbury, scaled to the
-  // building so it reads as light from it rather than a pillar.
-  const beacon = new THREE.Mesh(
-    new THREE.CylinderGeometry(BUILDING_HEIGHT * 0.06, BUILDING_HEIGHT * 0.3, BUILDING_HEIGHT * 2.4, 8, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: GOLD, transparent: true, opacity: 0.35,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    })
-  );
-  {
-    const base = bmDir.clone().multiplyScalar(R + BUILDING_HEIGHT);
-    beacon.position.copy(base);
-    beacon.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bmDir);
-  }
-  scene.add(beacon);
-
   // Seat the museum model at Bloomsbury; size the pile to it if it loads.
   const building = await loadBuilding(scene, bmDir).catch(() => null);
+
+  // Exit gate: a point just outside the entrance that artefacts funnel through.
+  const exitHead = THREE.MathUtils.degToRad(EXIT_HEADING_DEG);
+  const exitSide = camEast.clone().multiplyScalar(Math.cos(exitHead))
+    .addScaledVector(camNorth, Math.sin(exitHead));
+  const exitRadius = building ? building.radius : 4;
+  const exitPoint = bmDir.clone().multiplyScalar(R + BUILDING_HEIGHT * 0.35)
+    .addScaledVector(exitSide, exitRadius * 1.05);
 
   /* ------------------------------------------------ artefact geometry */
 
@@ -489,6 +483,7 @@ async function main() {
     uUseTake: { value: 0 },
     uTime: { value: 0 },
     uProjScale: { value: 1 },
+    uExit: { value: exitPoint }, // doorway all artefacts funnel through
   };
 
   const VERT = /* glsl */ `
@@ -501,13 +496,16 @@ async function main() {
     attribute float aDim;
     uniform float uProg, uReverse, uUseTake, uTime, uProjScale;
     uniform float uTrailShift, uSize;
+    uniform vec3 uExit;
     varying vec2 vTile;
     varying float vAlpha, vFlight;
 
     const float PI = 3.14159265;
     const float S = ${STAGGER.toFixed(1)};
+    const float GATE = ${EXIT_GATE.toFixed(3)};
 
-    vec3 arcPoint(vec3 p0, vec3 p1, float t) {
+    // Great-circle arc between two points, with an altitude bump scaled by lift.
+    vec3 arcPoint(vec3 p0, vec3 p1, float t, float lift) {
       float r0 = length(p0), r1 = length(p1);
       vec3 a = p0 / r0, b = p1 / r1;
       float c = clamp(dot(a, b), -1.0, 1.0);
@@ -518,8 +516,7 @@ async function main() {
       } else {
         dir = (sin((1.0 - t) * ang) * a + sin(t * ang) * b) / sin(ang);
       }
-      float lift = (4.0 + 26.0 * ang / PI) * sin(PI * t);
-      return dir * (mix(r0, r1, t) + lift);
+      return dir * (mix(r0, r1, t) + lift * (4.0 + 26.0 * ang / PI) * sin(PI * t));
     }
 
     void main() {
@@ -528,7 +525,19 @@ async function main() {
       float tMain = clamp(uProg * (1.0 + S) - ord * S, 0.0, 1.0);
       vec3 from = mix(aMuseum, aHome, uReverse);
       vec3 to = mix(aHome, aMuseum, uReverse);
-      vec3 p = arcPoint(from, to, t);
+
+      // Every journey passes through the doorway (uExit): a short funnel on the
+      // museum side and the long home arc on the other. The gate sits a small
+      // fraction in from the pile end, whichever direction we're travelling.
+      float gate = mix(GATE, 1.0 - GATE, uReverse);
+      vec3 p;
+      if (t < gate) {
+        float lt = t / max(gate, 1e-4);
+        p = arcPoint(from, uExit, lt, uReverse);          // arc only on the take (incoming) side
+      } else {
+        float lt = (t - gate) / max(1.0 - gate, 1e-4);
+        p = arcPoint(uExit, to, lt, 1.0 - uReverse);      // arc only on the return (outgoing) side
+      }
 
       vFlight = step(0.0001, tMain) * step(tMain, 0.9999);
       vTile = aTile;
@@ -936,12 +945,6 @@ async function main() {
         }
       }
     }
-
-    // beacon breathes while the pile is present
-    const pileHere = phase === 'museum' || phase === 'taking';
-    beacon.material.opacity = pileHere
-      ? 0.32 + 0.18 * (0.5 + 0.5 * Math.sin(anim.uTime.value * 1.3))
-      : Math.max(beacon.material.opacity - dt * 0.4, 0);
 
     if (camTween) {
       const t = Math.min((performance.now() - camTween.t0) / (camTween.secs * 1000), 1);
