@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Auto cache-bust before every commit so a stale app.js/app.css can never be
+# served again. Enable once with:  git config core.hooksPath tools/githooks
+set -euo pipefail
+repo="$(git rev-parse --show-toplevel)"
+"$repo/tools/bust-cache.sh"
+# Re-stage index.html if the hook rewrote its version tokens.
+if ! git diff --quiet -- index.html; then
+  git add index.html
+fi

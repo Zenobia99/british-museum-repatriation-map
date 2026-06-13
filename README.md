@@ -21,5 +21,31 @@ acquisitions in order, year by year, from 1600 to 2025.
   `data/atlas_manifest.json` (atlas tile UVs).
 - `legacy.html` — the original 2D map, linked from the deck.
 
+## Never serve a stale version again
+
+Browsers and the GitHub Pages CDN aggressively cache `app.js`/`app.css`,
+which made earlier edits appear "not deployed". These helpers remove the
+guesswork (all live in `tools/`, run from anywhere in the repo):
+
+| Command | What it does |
+| --- | --- |
+| `./tools/fresh.sh` | Kills any running server, pulls the latest commit, and serves it on a **brand-new port** the browser has never cached. Use this to preview locally. |
+| `./tools/serve.sh` | Just serve on a fresh random port (no pull). |
+| `./tools/bust-cache.sh` | Rewrites the `?v=` token on the assets to a hash of their contents. Runs automatically on every commit. |
+| `./tools/check-live.sh` | Fetches the live site bypassing caches and confirms it matches your local build. Run after pushing. |
+
+**Cache-busting is automatic.** A pre-commit hook (in `tools/githooks`)
+re-hashes the assets so each change ships under a new URL — a stale file
+can no longer be served. After cloning, enable it once with:
+
+```bash
+git config core.hooksPath tools/githooks
+```
+
+The on-screen build stamp (bottom-left) and the gold `[Return Them Home]
+build …` console line always tell you which version is actually running.
+
+## Licence
+
 Object photographs © The Trustees of the British Museum, CC BY-NC-SA 4.0
 unless noted otherwise in each object's panel.
