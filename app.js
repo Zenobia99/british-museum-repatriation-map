@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v17 — exit through the entrance';
+const BUILD = 'v18 — face the entrance';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -26,11 +26,10 @@ const BUILDING_HEIGHT = 0.9; // how tall the museum model stands, in globe units
 const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
 
 // Opening "hero" view: the camera looks AT the museum from an oblique angle.
-const VIEW_ELEV_DEG = 26;    // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
-const VIEW_HEADING_DEG = 0;  // which side of the building to view from (aim at the entrance)
-const HERO_DIST = 15;        // camera distance from the building in the opening shot
-const EXIT_HEADING_DEG = 0;  // which face the artefacts leave by (0 = the entrance we view in the opening shot)
-const EXIT_GATE = 0.16;      // fraction of each flight spent funnelling through the doorway
+const VIEW_ELEV_DEG = 26;      // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
+const HERO_DIST = 15;          // camera distance from the building in the opening shot
+const ENTRANCE_HEADING_DEG = 90; // which face is the entrance — drives BOTH the opening view and the exit (try ±90 / 180)
+const EXIT_GATE = 0.16;        // fraction of each flight spent funnelling through the doorway
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
 const TAKE_SECS = 14;
@@ -242,11 +241,14 @@ async function main() {
   const ORIGIN = new THREE.Vector3(0, 0, 0);
   // The opening view looks AT this point (the museum, just above its base).
   const buildingTarget = bmDir.clone().multiplyScalar(R + BUILDING_HEIGHT * 0.45);
+  // Horizontal direction the entrance faces (shared by the view and the exit).
+  const entranceHead = THREE.MathUtils.degToRad(ENTRANCE_HEADING_DEG);
+  const entranceDir = camEast.clone().multiplyScalar(Math.cos(entranceHead))
+    .addScaledVector(camNorth, Math.sin(entranceHead));
   function heroPos() {
     const elev = THREE.MathUtils.degToRad(VIEW_ELEV_DEG);
-    const head = THREE.MathUtils.degToRad(VIEW_HEADING_DEG);
-    const side = camEast.clone().multiplyScalar(Math.cos(head)).addScaledVector(camNorth, Math.sin(head));
-    const dir = bmDir.clone().multiplyScalar(Math.sin(elev)).addScaledVector(side, Math.cos(elev)).normalize();
+    const dir = bmDir.clone().multiplyScalar(Math.sin(elev))
+      .addScaledVector(entranceDir, Math.cos(elev)).normalize();
     return buildingTarget.clone().addScaledVector(dir, HERO_DIST);
   }
   // Pulled-back globe overview over Bloomsbury, looking at the planet's centre.
@@ -399,12 +401,9 @@ async function main() {
   const building = await loadBuilding(scene, bmDir).catch(() => null);
 
   // Exit gate: a point just outside the entrance that artefacts funnel through.
-  const exitHead = THREE.MathUtils.degToRad(EXIT_HEADING_DEG);
-  const exitSide = camEast.clone().multiplyScalar(Math.cos(exitHead))
-    .addScaledVector(camNorth, Math.sin(exitHead));
   const exitRadius = building ? building.radius : 4;
   const exitPoint = bmDir.clone().multiplyScalar(R + BUILDING_HEIGHT * 0.35)
-    .addScaledVector(exitSide, exitRadius * 1.05);
+    .addScaledVector(entranceDir, exitRadius * 1.05);
 
   /* ------------------------------------------------ artefact geometry */
 
