@@ -12,15 +12,17 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v10 — close detail on run';
+const BUILD = 'v11 — museum model + pile';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
 const BM = { lat: 51.5194, lng: -0.1269 };
+const BUILDING_SIZE = 11; // longest footprint dimension of the museum model, in globe units
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
 const TAKE_SECS = 14;
@@ -110,6 +112,41 @@ function loadTexture(url, msg) {
   });
 }
 
+// Load the British Museum model (if present) and seat it on the globe at
+// Bloomsbury, base on the surface, "up" along the local normal. Fire-and-forget
+// so a missing file never blocks boot; the artefacts emanate from it either way.
+async function loadBuilding(scene, bmDir) {
+  const loader = new GLTFLoader();
+  for (const url of ['assets/british-museum.glb', 'assets/british-museum.gltf']) {
+    let gltf;
+    try {
+      gltf = await loader.loadAsync(url);
+    } catch {
+      continue; // not this filename — try the next
+    }
+    const model = gltf.scene;
+    // Normalise: scale longest dimension to BUILDING_SIZE, centre on its
+    // footprint, drop its base to y = 0 (model "up" assumed +Y, glTF default).
+    let box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    model.scale.setScalar(BUILDING_SIZE / Math.max(size.x, size.y, size.z));
+    box = new THREE.Box3().setFromObject(model);
+    const c = box.getCenter(new THREE.Vector3());
+    model.position.set(-c.x, -box.min.y, -c.z);
+
+    const group = new THREE.Group();
+    group.add(model);
+    group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bmDir);
+    group.position.copy(bmDir).multiplyScalar(R);
+    group.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    scene.add(group);
+    console.log('[Return Them Home] museum model loaded from', url);
+    return group;
+  }
+  console.log('[Return Them Home] no museum model at assets/british-museum.glb — using marker only');
+  return null;
+}
+
 /* ----------------------------------------------------------------- main */
 
 async function main() {
@@ -162,6 +199,12 @@ async function main() {
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 1, 5000);
   const bmDir = latLngToV3(BM.lat, BM.lng, 1).normalize();
   camera.position.copy(bmDir).multiplyScalar(235);
+
+  // Lights — only the glTF museum uses lit materials; the globe is shader-lit.
+  scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x2a2418, 1.1));
+  const keyLight = new THREE.DirectionalLight(0xfff0d8, 1.6);
+  keyLight.position.copy(bmDir).multiplyScalar(200).add(new THREE.Vector3(40, 60, 30));
+  scene.add(keyLight);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -311,6 +354,9 @@ async function main() {
   }
   scene.add(beacon);
 
+  // Seat the museum model at Bloomsbury (async; pops in when loaded).
+  loadBuilding(scene, bmDir);
+
   /* ------------------------------------------------ artefact geometry */
 
   const museumPos = new Float32Array(N * 3);
@@ -318,20 +364,24 @@ async function main() {
   const acqYears = new Float32Array(N);
   const rng = mulberry(1753);
 
-  // Pile: sunflower spiral mound on the tangent plane at the museum
+  // Pile: a compact swarm hugging the museum so artefacts read as leaving the
+  // building, not a floating "mothership" disc. Narrow footprint, varied
+  // height across the building's volume.
   const east = new THREE.Vector3(0, 1, 0).cross(bmDir).normalize();
   const north = bmDir.clone().cross(east).normalize();
   const tmp = new THREE.Vector3();
+  const PILE_RADIUS = BUILDING_SIZE * 0.34;
   for (let i = 0; i < N; i++) {
     const f = i / N;
-    const rad = 7.5 * Math.sqrt(f);
+    const rad = PILE_RADIUS * Math.sqrt(f);
     const ang = i * 2.39996323;
-    const mound = 2.6 * Math.exp(-(rad * rad) / 18) * (0.35 + 0.65 * rng());
+    // height rises toward the centre and varies per object, spanning the model
+    const height = BUILDING_SIZE * (0.18 + 0.7 * Math.exp(-(rad * rad) / (PILE_RADIUS * 1.2)) * rng());
     tmp.copy(bmDir)
       .multiplyScalar(R)
       .addScaledVector(east, rad * Math.cos(ang))
       .addScaledVector(north, rad * Math.sin(ang));
-    tmp.normalize().multiplyScalar(R + 0.4 + mound);
+    tmp.normalize().multiplyScalar(R + height);
     museumPos.set([tmp.x, tmp.y, tmp.z], i * 3);
   }
 
