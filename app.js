@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v15 — hero view + smaller';
+const BUILD = 'v16 — frame building + zoom';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -25,10 +25,10 @@ const BM = { lat: 51.5194, lng: -0.1269 };
 const BUILDING_HEIGHT = 0.9; // how tall the museum model stands, in globe units
 const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
 
-// Opening "hero" view of the museum — tweak these to frame the entrance.
-const VIEW_TILT_DEG = 48;    // 0 = straight-down bird's eye; higher leans to a side-on facade view
-const VIEW_HEADING_DEG = 0;  // which way around the building to view from (aim at the entrance)
-const VIEW_DIST = 122;       // camera distance from the globe centre (min ~108)
+// Opening "hero" view: the camera looks AT the museum from an oblique angle.
+const VIEW_ELEV_DEG = 26;    // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
+const VIEW_HEADING_DEG = 0;  // which side of the building to view from (aim at the entrance)
+const HERO_DIST = 15;        // camera distance from the building in the opening shot
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
 const TAKE_SECS = 14;
@@ -237,15 +237,21 @@ async function main() {
   // Camera frame at the museum: a tangent basis used to compose the hero view.
   const camEast = new THREE.Vector3(0, 1, 0).cross(bmDir).normalize();
   const camNorth = bmDir.clone().cross(camEast).normalize();
-  function heroDir() {
-    const tilt = THREE.MathUtils.degToRad(VIEW_TILT_DEG);
+  const ORIGIN = new THREE.Vector3(0, 0, 0);
+  // The opening view looks AT this point (the museum, just above its base).
+  const buildingTarget = bmDir.clone().multiplyScalar(R + BUILDING_HEIGHT * 0.45);
+  function heroPos() {
+    const elev = THREE.MathUtils.degToRad(VIEW_ELEV_DEG);
     const head = THREE.MathUtils.degToRad(VIEW_HEADING_DEG);
-    return bmDir.clone().multiplyScalar(Math.cos(tilt))
-      .addScaledVector(camEast, Math.cos(head) * Math.sin(tilt))
-      .addScaledVector(camNorth, Math.sin(head) * Math.sin(tilt))
-      .normalize();
+    const side = camEast.clone().multiplyScalar(Math.cos(head)).addScaledVector(camNorth, Math.sin(head));
+    const dir = bmDir.clone().multiplyScalar(Math.sin(elev)).addScaledVector(side, Math.cos(elev)).normalize();
+    return buildingTarget.clone().addScaledVector(dir, HERO_DIST);
   }
-  camera.position.copy(heroDir()).multiplyScalar(VIEW_DIST);
+  // Pulled-back globe overview over Bloomsbury, looking at the planet's centre.
+  const globePos = () => bmDir.clone().multiplyScalar(300);
+  const HERO_RANGE = { min: 5, max: 90 };
+  const GLOBE_RANGE = { min: 110, max: 480 };
+  camera.position.copy(heroPos());
 
   // Lights — only the glTF museum uses lit materials; the globe is shader-lit.
   scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x2a2418, 1.1));
@@ -256,8 +262,9 @@ async function main() {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
-  controls.minDistance = 108;
-  controls.maxDistance = 480;
+  controls.minDistance = HERO_RANGE.min;
+  controls.maxDistance = HERO_RANGE.max;
+  controls.target.copy(buildingTarget);
   controls.rotateSpeed = 0.55;
   controls.enablePan = false;
   controls.autoRotate = false;
@@ -655,13 +662,17 @@ async function main() {
   let runStart = 0;
   let camTween = null;
 
-  function tweenCameraTo(dir, dist, secs) {
+  // Tween both the camera position and what it looks at. Distance clamping is
+  // disabled mid-flight (the target moves between the building and the globe
+  // centre) and the destination range is applied on arrival.
+  function tweenCamera(toPos, toTarget, secs, range) {
     camTween = {
-      from: camera.position.clone(),
-      to: dir.clone().normalize().multiplyScalar(dist),
-      t0: performance.now(),
-      secs,
+      fromPos: camera.position.clone(), toPos: toPos.clone(),
+      fromTgt: controls.target.clone(), toTgt: toTarget.clone(),
+      t0: performance.now(), secs, range,
     };
+    controls.minDistance = 0.01;
+    controls.maxDistance = Infinity;
   }
 
   function setPhase(p) {
@@ -701,14 +712,14 @@ async function main() {
       anim.uProg.value = 0;
       runStart = performance.now();
       setPhase('returning');
-      tweenCameraTo(camera.position, 330, 3.2);
+      tweenCamera(globePos(), ORIGIN, 3.4, GLOBE_RANGE);
     } else if (phase === 'home') {
       anim.uReverse.value = 1;
       anim.uUseTake.value = 1;
       anim.uProg.value = 0;
       runStart = performance.now();
       setPhase('taking');
-      tweenCameraTo(camera.position, 330, 3.2);
+      tweenCamera(globePos(), ORIGIN, 3.4, GLOBE_RANGE);
     }
   });
 
@@ -766,7 +777,7 @@ async function main() {
     const centroid = new THREE.Vector3();
     for (const i of idx) centroid.add(v.fromArray(homePos, i * 3));
     centroid.normalize();
-    tweenCameraTo(centroid, Math.min(camera.position.length(), 240), 1.4);
+    tweenCamera(centroid.multiplyScalar(230), ORIGIN, 1.4, GLOBE_RANGE);
   }
   search.addEventListener('change', runSearch);
   search.addEventListener('input', () => { if (!search.value.trim()) runSearch(); });
@@ -783,8 +794,22 @@ async function main() {
   $('reset-view').addEventListener('click', () => {
     search.value = '';
     runSearch();
-    if (phase === 'museum') tweenCameraTo(heroDir(), VIEW_DIST, 1.4);
-    else tweenCameraTo(new THREE.Vector3(0.3, 0.5, 1), 300, 1.4);
+    if (phase === 'museum') tweenCamera(heroPos(), buildingTarget, 1.4, HERO_RANGE);
+    else tweenCamera(globePos(), ORIGIN, 1.4, GLOBE_RANGE);
+  });
+
+  // Zoom the globe (scroll/pinch also work; Cmd +/- is the browser, not us).
+  function dolly(factor) {
+    const off = camera.position.clone().sub(controls.target);
+    const d = THREE.MathUtils.clamp(off.length() * factor, controls.minDistance, controls.maxDistance);
+    camera.position.copy(controls.target).addScaledVector(off.normalize(), d);
+  }
+  $('zoom-in').addEventListener('click', () => dolly(0.82));
+  $('zoom-out').addEventListener('click', () => dolly(1.22));
+  addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === 'INPUT') return;
+    if (e.key === '+' || e.key === '=') dolly(0.85);
+    else if (e.key === '-' || e.key === '_') dolly(1.18);
   });
 
   /* ------------------------------------------------ picking */
@@ -902,7 +927,14 @@ async function main() {
       } else {
         tickerBig.textContent = k > 0 ? String(Math.round(acqSorted[k - 1])) : String(Math.round(acqSorted[0]));
       }
-      if (raw >= 1) setPhase(phase === 'returning' ? 'home' : 'museum');
+      if (raw >= 1) {
+        if (phase === 'returning') {
+          setPhase('home');
+        } else {
+          setPhase('museum');
+          tweenCamera(heroPos(), buildingTarget, 2.2, HERO_RANGE); // back to the museum
+        }
+      }
     }
 
     // beacon breathes while the pile is present
@@ -913,8 +945,16 @@ async function main() {
 
     if (camTween) {
       const t = Math.min((performance.now() - camTween.t0) / (camTween.secs * 1000), 1);
-      camera.position.lerpVectors(camTween.from, camTween.to, easeOutCubic(t));
-      if (t >= 1) camTween = null;
+      const e = easeOutCubic(t);
+      camera.position.lerpVectors(camTween.fromPos, camTween.toPos, e);
+      controls.target.lerpVectors(camTween.fromTgt, camTween.toTgt, e);
+      if (t >= 1) {
+        if (camTween.range) {
+          controls.minDistance = camTween.range.min;
+          controls.maxDistance = camTween.range.max;
+        }
+        camTween = null;
+      }
     }
 
     controls.autoRotate = wantRotate && (phase === 'home' || phase === 'returning') && !pointer.downAt;
