@@ -17,13 +17,13 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v13 — textured museum';
+const BUILD = 'v14 — smaller + facade yaw';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
 const BM = { lat: 51.5194, lng: -0.1269 };
-const BUILDING_HEIGHT = 4.5; // how tall the museum model stands, in globe units
-const BUILDING_YAW = 0; // radians: spin the building about its up axis to aim the facade
+const BUILDING_HEIGHT = 1.2; // how tall the museum model stands, in globe units
+const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
 const TAKE_SECS = 14;
@@ -369,17 +369,17 @@ async function main() {
     })));
   }
 
-  // Museum beacon: a soft gold glow rising from Bloomsbury (kept short so it
-  // reads as light from the building, not a pillar through it).
+  // Museum beacon: a soft gold glow rising from Bloomsbury, scaled to the
+  // building so it reads as light from it rather than a pillar.
   const beacon = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.3, 1.4, 9, 8, 1, true),
+    new THREE.CylinderGeometry(BUILDING_HEIGHT * 0.06, BUILDING_HEIGHT * 0.3, BUILDING_HEIGHT * 2.4, 8, 1, true),
     new THREE.MeshBasicMaterial({
       color: GOLD, transparent: true, opacity: 0.35,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     })
   );
   {
-    const base = bmDir.clone().multiplyScalar(R + 4.5);
+    const base = bmDir.clone().multiplyScalar(R + BUILDING_HEIGHT);
     beacon.position.copy(base);
     beacon.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bmDir);
   }
