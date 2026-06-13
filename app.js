@@ -17,12 +17,13 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v12 — stone tint';
+const BUILD = 'v13 — textured museum';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
 const BM = { lat: 51.5194, lng: -0.1269 };
 const BUILDING_HEIGHT = 4.5; // how tall the museum model stands, in globe units
+const BUILDING_YAW = 0; // radians: spin the building about its up axis to aim the facade
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
 const TAKE_SECS = 14;
@@ -169,6 +170,7 @@ async function loadBuilding(scene, bmDir) {
   const group = new THREE.Group();
   group.add(model);
   group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bmDir);
+  if (BUILDING_YAW) group.rotateOnWorldAxis(bmDir, BUILDING_YAW);
   group.position.copy(bmDir).multiplyScalar(R);
   scene.add(group);
 
