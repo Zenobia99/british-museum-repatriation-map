@@ -10,6 +10,11 @@
 
 * { box-sizing: border-box; }
 
+/* The [hidden] attribute must always win. Author rules like
+   `.fallback { display: flex }` otherwise override the UA `[hidden]`
+   rule and leave the element permanently visible. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
