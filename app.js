@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v11 — museum model + pile';
+const BUILD = 'v12 — stone tint';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -130,6 +130,29 @@ async function loadBuilding(scene, bmDir) {
     console.log('[Return Them Home] no museum model at assets/british-museum.(glb|gltf) — marker only');
     return null;
   }
+
+  // Until a textured model is supplied, plain/white materials read as a sci-fi
+  // hull. Tint any untextured material to warm Portland stone, and drop any
+  // wireframe-overlay meshes the architectural export left behind.
+  const STONE = new THREE.Color('#c9bca0');
+  const toRemove = [];
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const name = (o.material && o.material.name) || '';
+    if (/wire/i.test(name) || (o.material && o.material.wireframe)) {
+      toRemove.push(o);
+      return;
+    }
+    for (const m of mats) {
+      if (m && !m.map) {
+        m.color = STONE.clone();
+        if ('roughness' in m) m.roughness = 0.92;
+        if ('metalness' in m) m.metalness = 0.0;
+      }
+    }
+  });
+  for (const o of toRemove) o.parent && o.parent.remove(o);
 
   // The glTF already carries a node transform to Y-up (verified: loaded bbox
   // is ~102 x 23 x 133, so Y is the vertical axis) — no extra rotation needed.
