@@ -320,9 +320,9 @@ async function main() {
   const tmp = new THREE.Vector3();
   for (let i = 0; i < N; i++) {
     const f = i / N;
-    const rad = 5.2 * Math.sqrt(f);
+    const rad = 7.5 * Math.sqrt(f);
     const ang = i * 2.39996323;
-    const mound = 2.6 * Math.exp(-(rad * rad) / 9) * (0.35 + 0.65 * rng());
+    const mound = 2.6 * Math.exp(-(rad * rad) / 18) * (0.35 + 0.65 * rng());
     tmp.copy(bmDir)
       .multiplyScalar(R)
       .addScaledVector(east, rad * Math.cos(ang))
@@ -422,7 +422,7 @@ async function main() {
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       float size = uSize * (1.0 - 0.35 * aDim);
       size *= 1.0 + 0.10 * sin(uTime * 1.7 + aRand * 6.283);
-      gl_PointSize = clamp(size * uProjScale / -mv.z, 1.5, 46.0);
+      gl_PointSize = clamp(size * uProjScale / -mv.z, 1.5, 22.0);
       vAlpha = 1.0 - 0.92 * aDim;
       gl_Position = projectionMatrix * mv;
     }`;
@@ -461,6 +461,7 @@ async function main() {
 
   const dimAttrs = []; // [{attr, indices}] for search dimming
   const photoLayers = [];
+  const trailLayers = []; // shown only during flight to cut static overdraw
 
   for (let s = 0; s < 5; s++) {
     const idx = groups[s];
@@ -518,7 +519,9 @@ async function main() {
       for (const [shift, size] of [[0.10, 0.9], [0.05, 1.3]]) {
         const trail = new THREE.Points(g, mk(FRAG_TRAIL, shift, { size, depthWrite: false, additive: true }));
         trail.renderOrder = 1;
+        trail.visible = false; // only during flight — avoids huge static overdraw
         scene.add(trail);
+        trailLayers.push(trail);
       }
     }
     const photos = new THREE.Points(g, mk(FRAG_PHOTO, 0, { size: 2.7, depthWrite: true, additive: false }));
@@ -559,6 +562,10 @@ async function main() {
     const settled = p === 'museum' || p === 'home';
     act.disabled = !settled;
     ticker.hidden = settled;
+    // Glow trails only exist mid-flight; hiding them when settled removes
+    // ~10,000 blended point-sprites per frame (a GPU-watchdog trigger).
+    const flying = p === 'returning' || p === 'taking';
+    for (const t of trailLayers) t.visible = flying;
     if (p === 'museum') {
       actGlyph.textContent = '⟿';
       actLabel.textContent = 'Return them home';
@@ -758,7 +765,7 @@ async function main() {
     anim.uTime.value += dt;
     anim.uProjScale.value =
       (renderer.domElement.clientHeight * 0.5 * camera.projectionMatrix.elements[5]) *
-      Math.min(devicePixelRatio || 1, 2);
+      renderer.getPixelRatio();
 
     // run the migration
     if (phase === 'returning' || phase === 'taking') {
