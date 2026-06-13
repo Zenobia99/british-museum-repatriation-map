@@ -16,7 +16,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v8 — card-overlay fix';
+const BUILD = 'v9 — force-hide card';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -75,6 +75,7 @@ function bootTick(msg) {
 function fatal(err) {
   $('boot').classList.add('gone');
   $('fallback').hidden = false;
+  $('fallback').style.display = 'flex';
   if (err) {
     const card = document.querySelector('.fallback-card p');
     if (card) card.textContent = `Error: ${err.message || err}`;
@@ -761,6 +762,10 @@ async function main() {
   const clock = new THREE.Clock();
   setPhase('museum');
   $('boot').classList.add('gone');
+  // We reached the render loop, so WebGL is fine — guarantee the fallback
+  // card is hidden regardless of any earlier state.
+  $('fallback').hidden = true;
+  $('fallback').style.display = 'none';
 
   // Visible build stamp so we can confirm which version is actually live
   const stamp = document.createElement('div');
