@@ -16,7 +16,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v9 — force-hide card';
+const BUILD = 'v10 — close detail on run';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -588,6 +588,10 @@ async function main() {
   }
 
   act.addEventListener('click', () => {
+    // The detail panel is pinned to one artefact; close it (and any tooltip)
+    // when a run starts, since everything is about to move.
+    $('detail').hidden = true;
+    $('tip').hidden = true;
     if (phase === 'museum') {
       anim.uReverse.value = 0;
       anim.uUseTake.value = 0;
