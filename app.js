@@ -17,13 +17,18 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v14 — smaller + facade yaw';
+const BUILD = 'v15 — hero view + smaller';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
 const BM = { lat: 51.5194, lng: -0.1269 };
-const BUILDING_HEIGHT = 1.2; // how tall the museum model stands, in globe units
+const BUILDING_HEIGHT = 0.9; // how tall the museum model stands, in globe units
 const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
+
+// Opening "hero" view of the museum — tweak these to frame the entrance.
+const VIEW_TILT_DEG = 48;    // 0 = straight-down bird's eye; higher leans to a side-on facade view
+const VIEW_HEADING_DEG = 0;  // which way around the building to view from (aim at the entrance)
+const VIEW_DIST = 122;       // camera distance from the globe centre (min ~108)
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
 const TAKE_SECS = 14;
@@ -228,7 +233,19 @@ async function main() {
   scene.background = new THREE.Color('#04060d');
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 1, 5000);
   const bmDir = latLngToV3(BM.lat, BM.lng, 1).normalize();
-  camera.position.copy(bmDir).multiplyScalar(235);
+
+  // Camera frame at the museum: a tangent basis used to compose the hero view.
+  const camEast = new THREE.Vector3(0, 1, 0).cross(bmDir).normalize();
+  const camNorth = bmDir.clone().cross(camEast).normalize();
+  function heroDir() {
+    const tilt = THREE.MathUtils.degToRad(VIEW_TILT_DEG);
+    const head = THREE.MathUtils.degToRad(VIEW_HEADING_DEG);
+    return bmDir.clone().multiplyScalar(Math.cos(tilt))
+      .addScaledVector(camEast, Math.cos(head) * Math.sin(tilt))
+      .addScaledVector(camNorth, Math.sin(head) * Math.sin(tilt))
+      .normalize();
+  }
+  camera.position.copy(heroDir()).multiplyScalar(VIEW_DIST);
 
   // Lights — only the glTF museum uses lit materials; the globe is shader-lit.
   scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x2a2418, 1.1));
@@ -239,7 +256,7 @@ async function main() {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
-  controls.minDistance = 118;
+  controls.minDistance = 108;
   controls.maxDistance = 480;
   controls.rotateSpeed = 0.55;
   controls.enablePan = false;
@@ -766,7 +783,8 @@ async function main() {
   $('reset-view').addEventListener('click', () => {
     search.value = '';
     runSearch();
-    tweenCameraTo(phase === 'home' || phase === 'returning' ? new THREE.Vector3(0.3, 0.5, 1) : bmDir, 235, 1.4);
+    if (phase === 'museum') tweenCameraTo(heroDir(), VIEW_DIST, 1.4);
+    else tweenCameraTo(new THREE.Vector3(0.3, 0.5, 1), 300, 1.4);
   });
 
   /* ------------------------------------------------ picking */
