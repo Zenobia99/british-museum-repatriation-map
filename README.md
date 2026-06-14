@@ -23,21 +23,32 @@ acquisitions in order, year by year, from 1600 to 2025.
 
 ## Enriching the object data
 
-Many records lack `material`, `date_text` or a `description`.
-`tools/enrich.py` back-fills those **blanks** (never overwriting existing
-values) from each object's British Museum collection page, trimming
-descriptions to two sentences. It must run where britishmuseum.org is
-reachable (e.g. your Mac) — not in the Claude sandbox.
+Many records lack `material`, `date_text` or a `description`. The British
+Museum site is behind Cloudflare, which only a real, warmed Chrome profile
+clears reliably — so enrichment runs in Node (Playwright), mirroring the
+proven `harvest.ts` recipe. It fills **blanks only** (never overwriting)
+and trims descriptions to two sentences.
+
+Run it on a Mac with Google Chrome and a Cloudflare-warmed profile,
+reusing an existing Playwright install via `NODE_PATH`:
 
 ```bash
-python3 tools/enrich.py --dump Y_EA77434   # 1. check the field mapping on one object
-python3 tools/enrich.py --limit 20 --dry-run  # 2. preview without writing
-python3 tools/enrich.py                     # 3. full run -> rewrites data/artifacts.json
+cd ~/bm-test
+BM_PROFILE=/path/to/chrome_data_extractor \
+NODE_PATH=/path/to/british-museum-extractor/node_modules \
+node tools/enrich.mjs --dump Y_EA77434     # 1. check one object
+# (same env) node tools/enrich.mjs --limit 20 --dry   # 2. preview 20
+# (same env) node tools/enrich.mjs                     # 3. full run -> writes data/artifacts.json
 ```
 
-Fetched pages are cached under `tools/.enrich_cache/` (gitignored), so the
-run is resumable and re-runs are cheap. The detail card shows the
-description when present.
+A headed real-Chrome window opens (clear any Cloudflare prompt once).
+Flags: `--limit N`, `--dry`, `--dump BM_ID`, `--headless`. Blanks-only +
+checkpoints every 25 objects make it resumable — stop/restart freely.
+After it finishes: `git add data/artifacts.json && git commit && git push`.
+The detail card shows the description when present.
+
+(`tools/enrich.py` is an earlier pure-Python version; the Node script is
+preferred because Cloudflare needs the real Chrome profile.)
 
 ## Never serve a stale version again
 
