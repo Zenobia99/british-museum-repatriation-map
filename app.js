@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v20 — open on front entrance';
+const BUILD = 'v21 — object descriptions';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -858,6 +858,9 @@ async function main() {
     $('detail-museum').textContent = a.museum_number || a.bm_id;
     const y = parseAcqYear(a.museum_number);
     $('detail-acquired').textContent = y ? `by the British Museum, ${y}` : 'date unrecorded';
+    const descEl = $('detail-desc');
+    descEl.textContent = a.description || '';
+    descEl.hidden = !a.description;
     $('detail-license').textContent = a.image_license || '';
     detail.hidden = false;
   }

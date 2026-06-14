@@ -21,6 +21,24 @@ acquisitions in order, year by year, from 1600 to 2025.
   `data/atlas_manifest.json` (atlas tile UVs).
 - `legacy.html` — the original 2D map, linked from the deck.
 
+## Enriching the object data
+
+Many records lack `material`, `date_text` or a `description`.
+`tools/enrich.py` back-fills those **blanks** (never overwriting existing
+values) from each object's British Museum collection page, trimming
+descriptions to two sentences. It must run where britishmuseum.org is
+reachable (e.g. your Mac) — not in the Claude sandbox.
+
+```bash
+python3 tools/enrich.py --dump Y_EA77434   # 1. check the field mapping on one object
+python3 tools/enrich.py --limit 20 --dry-run  # 2. preview without writing
+python3 tools/enrich.py                     # 3. full run -> rewrites data/artifacts.json
+```
+
+Fetched pages are cached under `tools/.enrich_cache/` (gitignored), so the
+run is resumable and re-runs are cheap. The detail card shows the
+description when present.
+
 ## Never serve a stale version again
 
 Browsers and the GitHub Pages CDN aggressively cache `app.js`/`app.css`,
