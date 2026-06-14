@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-    <title>If All Artefacts Returned Home — British Museum</title>
+    <title>Return Them Home — 5,000 British Museum Artefacts</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230a1020' stroke='%23e8b14a' stroke-width='2'/%3E%3Cpath d='M16 4a18 12 0 000 24M16 4a18 12 0 010 24M3 16h26' stroke='%23e8b14a' stroke-width='1' fill='none' opacity='0.6'/%3E%3C/svg%3E"
     />
     <meta
       name="description"
-      content="A 3D globe placing ~5,000 British Museum artefacts at their true origins, with animated return-home arcs from London."
+      content="5,000 British Museum objects piled at Bloomsbury — press one button and watch them stream home along glowing arcs to 88 nations."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,89 +18,95 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Spline+Sans+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-DP_PhlzL.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-C9Vcw34W.css">
+    <link rel="stylesheet" href="./app.css?v=8f12f95a11" />
+    <script>
+      if (new URLSearchParams(location.search).has('legacy')) location.replace('legacy.html');
+      // Boot watchdog: if the app module never executes (e.g. a network filter
+      // blocks cdn.jsdelivr.net), say so instead of spinning forever.
+      setTimeout(function () {
+        if (!window.__appJsLoaded) {
+          var sub = document.getElementById('boot-sub');
+          if (sub) sub.textContent =
+            'Could not load the 3D engine (cdn.jsdelivr.net may be blocked by a network filter or extension).';
+        }
+      }, 15000);
+    </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+          "topojson-client": "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm"
+        }
+      }
+    </script>
+    <script type="module" src="./app.js?v=332b621f0c"></script>
   </head>
   <body>
     <div id="app">
-      <canvas-host id="globe-host"></canvas-host>
+      <div id="globe-host"></div>
 
       <!-- Boot / loading veil -->
       <div id="boot" class="boot">
         <div class="boot-mark">◍</div>
-        <div class="boot-title">If All Artefacts Returned Home</div>
+        <div class="boot-title">Return Them Home</div>
         <div class="boot-sub" id="boot-sub">Summoning the collection…</div>
         <div class="boot-bar"><span id="boot-bar-fill"></span></div>
       </div>
 
       <!-- Title plate -->
       <header class="plate">
-        <h1>
-          <span class="plate-glyph">⟿</span> If All Artefacts <em>Returned Home</em>
-        </h1>
+        <h1><span class="plate-glyph">⟿</span> Return <em>Them Home</em></h1>
         <p>
-          <strong id="stat-total">5,000</strong> British Museum objects, replanted at
-          their true origins across <strong id="stat-countries">88</strong> nations.
-          Each is a real photograph; together they redraw the map.
+          <strong id="stat-total">5,000</strong> objects from
+          <strong id="stat-countries">88</strong> nations sit in one building in
+          Bloomsbury. Every photograph below is real. Press the button.
         </p>
       </header>
+
+      <!-- Phase ticker (center top) -->
+      <div id="ticker" class="ticker" hidden>
+        <div class="ticker-big" id="ticker-big">0</div>
+        <div class="ticker-sub" id="ticker-sub">objects returned</div>
+      </div>
+
+      <!-- The button -->
+      <div class="stage-actions">
+        <button id="act" class="act">
+          <span class="act-glyph">⟿</span><span id="act-label">Return them home</span>
+        </button>
+        <div class="stage-hint" id="stage-hint">
+          5,000 artefacts are currently piled on the British Museum
+        </div>
+      </div>
 
       <!-- Control deck -->
       <aside class="deck" id="deck">
         <div class="deck-group">
-          <label class="deck-label" for="search">Search origin / object</label>
-          <div class="search-wrap">
-            <input
-              id="search"
-              type="text"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="e.g. Greece, bronze, mask…"
-              list="country-list"
-            />
-            <datalist id="country-list"></datalist>
-          </div>
+          <label class="deck-label" for="search">Find a nation</label>
+          <input
+            id="search"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="e.g. Greece, Nigeria, Egypt…"
+            list="country-list"
+          />
+          <datalist id="country-list"></datalist>
+          <div class="deck-found" id="deck-found" hidden></div>
         </div>
-
-        <div class="deck-group">
-          <div class="deck-row">
-            <label class="deck-label">Date range</label>
-            <span class="deck-readout" id="year-readout">—</span>
-          </div>
-          <div class="range-dual">
-            <input id="year-from" type="range" />
-            <input id="year-to" type="range" />
-          </div>
-          <label class="chk">
-            <input type="checkbox" id="undated" checked />
-            <span>Include undated</span>
-          </label>
-        </div>
-
         <div class="deck-group toggles">
-          <button class="toggle" id="t-rotate" aria-pressed="false">
+          <button class="toggle" id="t-rotate" aria-pressed="true">
             <span class="dot"></span> Rotate
           </button>
-          <button class="toggle" id="t-labels" aria-pressed="false">
-            <span class="dot"></span> Labels
-          </button>
-          <button class="toggle" id="t-origins" aria-pressed="false">
-            <span class="dot"></span> Origins
-          </button>
+          <button class="ghost" id="reset-view">Reset view</button>
         </div>
-
-        <div class="deck-group">
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="ghost" id="reset-view" style="flex: 2;">Reset view</button>
-            <button class="ghost" id="zoom-in" style="flex: 1; font-weight: bold; font-size: 14px; padding: 6px 0; display: flex; align-items: center; justify-content: center;" title="Zoom In">+</button>
-            <button class="ghost" id="zoom-out" style="flex: 1; font-weight: bold; font-size: 14px; padding: 6px 0; display: flex; align-items: center; justify-content: center;" title="Zoom Out">−</button>
-          </div>
-          <span class="visible-count"><strong id="stat-visible">0</strong> in view</span>
+        <div class="deck-group toggles">
+          <button class="ghost" id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+          <button class="ghost" id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
         </div>
-
         <div class="deck-foot">
-          <span id="fps-readout" class="fps">—</span>
-          <a class="legacy-link" href="?legacy=1">2D map →</a>
+          <a class="legacy-link" href="legacy.html">2D map →</a>
         </div>
       </aside>
 
@@ -110,9 +116,7 @@
       <!-- Detail panel -->
       <section id="detail" class="detail" hidden>
         <button class="detail-close" id="detail-close" aria-label="Close">×</button>
-        <div class="detail-img-wrap">
-          <img id="detail-img" alt="" />
-        </div>
+        <div class="detail-img-wrap"><img id="detail-img" alt="" /></div>
         <div class="detail-body">
           <h2 id="detail-name"></h2>
           <dl>
@@ -120,11 +124,9 @@
             <dt>Date</dt><dd id="detail-date"></dd>
             <dt>Material</dt><dd id="detail-material"></dd>
             <dt>Museum no.</dt><dd id="detail-museum"></dd>
+            <dt>Acquired</dt><dd id="detail-acquired"></dd>
           </dl>
           <p class="detail-license" id="detail-license"></p>
-          <a id="detail-source" class="detail-source" target="_blank" rel="noopener">
-            View source image →
-          </a>
         </div>
       </section>
 
@@ -132,14 +134,13 @@
       <div id="fallback" class="fallback" hidden>
         <div class="fallback-card">
           <h2>3D unavailable on this device</h2>
-          <p>Your browser lost the WebGL context or runs on low-tier graphics. The classic 2D map works everywhere.</p>
-          <a class="ghost" href="?legacy=1">Open the 2D map →</a>
+          <p>
+            Your browser lost the WebGL context or runs on low-tier graphics.
+            The classic 2D map works everywhere.
+          </p>
+          <a class="ghost" href="legacy.html">Open the 2D map →</a>
         </div>
       </div>
-
-      <!-- Build stamp (bottom-right) — visible to verify which bundle is loaded -->
-      <div id="build-stamp" class="build-stamp" title="Build identifier — compare with the README version"></div>
     </div>
-
   </body>
 </html>
