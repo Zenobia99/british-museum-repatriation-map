@@ -55,13 +55,16 @@ DESC_MAX_CHARS = 300
 # --------------------------------------------------------------- networking
 
 class Fetcher:
-    """Lazily-started Playwright browser with a persistent context so the
-    Cloudflare clearance cookie is reused for every object."""
+    """Playwright browser with a PERSISTENT profile so the Cloudflare
+    clearance cookie survives across pages and across runs. Once you clear
+    the challenge once (use --headed the first time), later pages sail through."""
+
+    PROFILE = BASE / "tools" / ".enrich_profile"
 
     def __init__(self, headed=False, delay=1.0):
         self.headed = headed
         self.delay = delay
-        self._pw = self._browser = self._ctx = None
+        self._pw = self._ctx = None
 
     def _ensure(self):
         if self._ctx:
@@ -73,37 +76,45 @@ class Fetcher:
                 "Playwright is required:\n"
                 "  pip install playwright && playwright install chromium")
         self._pw = sync_playwright().start()
-        self._browser = self._pw.chromium.launch(headless=not self.headed)
-        self._ctx = self._browser.new_context(
-            user_agent=UA, locale="en-GB", viewport={"width": 1280, "height": 900})
+        self._ctx = self._pw.chromium.launch_persistent_context(
+            str(self.PROFILE),
+            headless=not self.headed,
+            user_agent=UA, locale="en-GB", timezone_id="Europe/London",
+            viewport={"width": 1280, "height": 900},
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        # Hide the most obvious automation tell from Cloudflare.
+        self._ctx.add_init_script(
+            "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
 
     def get(self, url):
         self._ensure()
         page = self._ctx.new_page()
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            # Wait out Cloudflare + client render until the detail list appears.
-            for _ in range(8):
+            reloaded = False
+            for i in range(20):  # up to ~40s of challenge/render wait
                 html = page.content()
                 title = (page.title() or "").lower()
-                if "just a moment" not in title and "object-detail__data-term" in html:
-                    break
+                if "object-detail__data-term" in html:
+                    return html
+                if i == 10 and not reloaded:  # nudge a stuck challenge once
+                    reloaded = True
+                    try:
+                        page.reload(wait_until="domcontentloaded", timeout=60000)
+                    except Exception:  # noqa: BLE001
+                        pass
                 page.wait_for_timeout(2000)
-            try:
-                page.wait_for_load_state("networkidle", timeout=15000)
-            except Exception:  # noqa: BLE001
-                pass
-            return page.content()
+            return page.content()  # give back whatever we have
         finally:
             page.close()
             time.sleep(self.delay)
 
     def close(self):
-        for obj in (self._ctx, self._browser):
-            try:
-                obj and obj.close()
-            except Exception:  # noqa: BLE001
-                pass
+        try:
+            self._ctx and self._ctx.close()
+        except Exception:  # noqa: BLE001
+            pass
         try:
             self._pw and self._pw.stop()
         except Exception:  # noqa: BLE001
@@ -111,14 +122,16 @@ class Fetcher:
 
 
 def get_page(fetcher, bm_id):
-    """Return the page HTML, from cache if present, else fetch + cache."""
+    """Return page HTML; cache only SUCCESSFUL renders so a Cloudflare
+    challenge page is never cached (and will be retried on the next run)."""
     CACHE.mkdir(parents=True, exist_ok=True)
     cached = CACHE / f"{bm_id}.html"
     if cached.exists():
         return cached.read_text("utf-8", "replace")
-    html = fetcher.get(OBJECT_URL.format(bm_id=bm_id))
-    cached.write_text(html or "", "utf-8")
-    return html or ""
+    html = fetcher.get(OBJECT_URL.format(bm_id=bm_id)) or ""
+    if "object-detail__data-term" in html:
+        cached.write_text(html, "utf-8")
+    return html
 
 
 # --------------------------------------------------------------- parsing
