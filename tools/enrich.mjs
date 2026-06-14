@@ -77,11 +77,22 @@ function mapFields(d) {
 async function warm(page) {
   await page.goto("https://www.britishmuseum.org/collection/search?keyword=museum&has_image=1",
     { waitUntil: "domcontentloaded", timeout: 60000 });
-  await sleep(5000);
+  // Wait — up to ~2 min — for Cloudflare to clear. If the window shows a
+  // "Just a moment…" / Turnstile challenge, SOLVE IT BY HAND in that window;
+  // once cleared the warmed cookies persist in the profile for the whole run.
+  for (let i = 0; i < 60; i++) {
+    const title = (await page.title().catch(() => "")).toLowerCase();
+    const challenged = title.includes("just a moment") || title.includes("attention required");
+    if (!challenged) break;
+    if (i === 0) console.log("\n>>> Cloudflare challenge — please solve it in the Chrome window. Waiting…\n");
+    await sleep(2000);
+  }
+  await sleep(2000);
   try {
     const btn = page.locator('button:has-text("Allow all cookies"), button:has-text("Reject all cookies")').first();
     if (await btn.isVisible({ timeout: 2500 })) { await btn.click(); await sleep(1500); }
   } catch { /* no modal */ }
+  console.log("[warm] session ready.");
 }
 
 async function fetchObject(page, id) {
