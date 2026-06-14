@@ -2,8 +2,15 @@
 """
 Enrich data/artifacts.json from the British Museum collection website.
 
-Network access is required, so run this on a machine that can reach
-britishmuseum.org (e.g. your Mac) — NOT inside the Claude sandbox.
+The BM site sits behind Cloudflare, so plain HTTP gets a 403. This uses
+Playwright (a real browser) to pass the challenge, reusing ONE browser
+context so the clearance cookie carries across every request. Run it on a
+machine that can reach britishmuseum.org (e.g. your Mac) — NOT in the
+Claude sandbox.
+
+One-time setup:
+  pip install playwright
+  playwright install chromium
 
 Behaviour (per your settings):
   - ONLY fills blank fields (material, date_text, description). Never
@@ -15,8 +22,8 @@ Behaviour (per your settings):
 Typical use:
   1. Validate the field mapping on one object first:
        python3 tools/enrich.py --dump Y_EA77434
-     (prints the raw record the parser found — check it has the right
-      description/date/material, then paste it to me if anything's off.)
+     It also saves the rendered HTML to tools/.enrich_cache/Y_EA77434.html
+     — if the extracted fields look wrong/empty, send me that file.
   2. Dry-run a handful:
        python3 tools/enrich.py --limit 20 --dry-run
   3. Full run (writes data/artifacts.json):
@@ -25,17 +32,14 @@ Typical use:
 Flags:
   --limit N     only process the first N objects that still have blanks
   --dry-run     fetch + parse + report, but don't write artifacts.json
-  --dump ID     fetch one bm_id, print the parsed record, exit
+  --dump ID     fetch one bm_id, print the parsed record + save HTML, exit
   --delay S     seconds between live fetches (default 1.0; be kind)
+  --headed      show the browser window (sometimes helps clear Cloudflare)
 """
 import argparse
-import gzip
 import json
 import re
-import sys
 import time
-import urllib.request
-import urllib.error
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
@@ -58,43 +62,71 @@ FIELD_CANDIDATES = {
 
 # --------------------------------------------------------------- networking
 
-def fetch(url):
-    req = urllib.request.Request(url, headers={
-        "User-Agent": UA,
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Encoding": "gzip, deflate",
-        "Accept-Language": "en-GB,en;q=0.9",
-    })
-    with urllib.request.urlopen(req, timeout=30) as r:
-        raw = r.read()
-        if r.headers.get("Content-Encoding") == "gzip":
-            raw = gzip.decompress(raw)
-    return raw.decode("utf-8", "replace")
+class Fetcher:
+    """Lazily-started Playwright browser with a persistent context so the
+    Cloudflare clearance cookie is reused for every object."""
+
+    def __init__(self, headed=False, delay=1.0):
+        self.headed = headed
+        self.delay = delay
+        self._pw = self._browser = self._ctx = None
+
+    def _ensure(self):
+        if self._ctx:
+            return
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise SystemExit(
+                "Playwright is required:\n"
+                "  pip install playwright && playwright install chromium")
+        self._pw = sync_playwright().start()
+        self._browser = self._pw.chromium.launch(headless=not self.headed)
+        self._ctx = self._browser.new_context(
+            user_agent=UA, locale="en-GB", viewport={"width": 1280, "height": 900})
+
+    def get(self, url):
+        self._ensure()
+        page = self._ctx.new_page()
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            # Give Cloudflare's challenge + client render time to settle.
+            for _ in range(6):
+                html = page.content()
+                title = (page.title() or "").lower()
+                if "just a moment" not in title and "__NEXT_DATA__" in html:
+                    break
+                page.wait_for_timeout(2000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:  # noqa: BLE001
+                pass
+            return page.content()
+        finally:
+            page.close()
+            time.sleep(self.delay)
+
+    def close(self):
+        for obj in (self._ctx, self._browser):
+            try:
+                obj and obj.close()
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            self._pw and self._pw.stop()
+        except Exception:  # noqa: BLE001
+            pass
 
 
-def get_page(bm_id, delay):
+def get_page(fetcher, bm_id):
     """Return the page HTML, from cache if present, else fetch + cache."""
     CACHE.mkdir(parents=True, exist_ok=True)
     cached = CACHE / f"{bm_id}.html"
     if cached.exists():
-        return cached.read_text("utf-8", "replace"), True
-    url = OBJECT_URL.format(bm_id=bm_id)
-    last = None
-    for attempt in range(4):
-        try:
-            html = fetch(url)
-            cached.write_text(html, "utf-8")
-            time.sleep(delay)
-            return html, False
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                cached.write_text("", "utf-8")  # remember the miss
-                return "", False
-            last = e
-        except Exception as e:  # noqa: BLE001 - network is messy; retry
-            last = e
-        time.sleep(2 ** attempt)
-    raise RuntimeError(f"failed to fetch {url}: {last}")
+        return cached.read_text("utf-8", "replace")
+    html = fetcher.get(OBJECT_URL.format(bm_id=bm_id))
+    cached.write_text(html or "", "utf-8")
+    return html or ""
 
 
 # --------------------------------------------------------------- parsing
@@ -201,61 +233,71 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--dump", metavar="BM_ID")
     ap.add_argument("--delay", type=float, default=1.0)
+    ap.add_argument("--headed", action="store_true")
     args = ap.parse_args()
 
     data = json.loads(DATA.read_text("utf-8"))
+    fetcher = Fetcher(headed=args.headed, delay=args.delay)
 
-    if args.dump:
-        html, cached = get_page(args.dump, args.delay)
-        if not html:
-            print(f"No page for {args.dump} (404 or empty).")
+    try:
+        if args.dump:
+            html = get_page(fetcher, args.dump)
+            saved = CACHE / f"{args.dump}.html"
+            if not html:
+                print(f"No page for {args.dump} (404 or empty).")
+                return
+            a = next((x for x in data if x.get("bm_id") == args.dump), {})
+            parsed = parse_object(html, args.dump, a.get("museum_number"))
+            if not parsed:
+                print("Could not locate the object record in __NEXT_DATA__.")
+                print(f"Rendered HTML saved to {saved}")
+                print("Send me that file and I'll fix the parser to match the page.")
+                return
+            rec = parsed.pop("_record")
+            print("=== extracted fields ===")
+            print(json.dumps(parsed, indent=2, ensure_ascii=False))
+            print("\n=== raw record keys ===")
+            print(sorted(rec.keys()))
+            print("\n=== raw record (first 2000 chars) ===")
+            print(json.dumps(rec, indent=2, ensure_ascii=False)[:2000])
+            print(f"\n(rendered HTML also saved to {saved})")
             return
-        a = next((x for x in data if x.get("bm_id") == args.dump), {})
-        parsed = parse_object(html, args.dump, a.get("museum_number"))
-        if not parsed:
-            print("Could not locate the object record in __NEXT_DATA__.")
-            print("Paste this script's output to Claude so the mapping can be fixed.")
-            return
-        rec = parsed.pop("_record")
-        print("=== extracted fields ===")
-        print(json.dumps(parsed, indent=2, ensure_ascii=False))
-        print("\n=== raw record keys ===")
-        print(sorted(rec.keys()))
-        print("\n=== raw record (first 2000 chars) ===")
-        print(json.dumps(rec, indent=2, ensure_ascii=False)[:2000])
-        return
 
-    todo = [a for a in data if needs_enrich(a) and a.get("bm_id")]
-    if args.limit:
-        todo = todo[:args.limit]
-    print(f"{len(todo)} objects still have blanks; processing "
-          f"{len(todo)}{' (dry run)' if args.dry_run else ''}…")
+        todo = [a for a in data if needs_enrich(a) and a.get("bm_id")]
+        if args.limit:
+            todo = todo[:args.limit]
+        print(f"{len(todo)} objects still have blanks; processing "
+              f"{len(todo)}{' (dry run)' if args.dry_run else ''}…")
 
-    filled = {"material": 0, "date_text": 0, "description": 0}
-    no_record = 0
-    for i, a in enumerate(todo, 1):
-        try:
-            html, cached = get_page(a["bm_id"], args.delay)
-        except Exception as e:  # noqa: BLE001
-            print(f"  [{i}/{len(todo)}] {a['bm_id']}: fetch error: {e}")
-            continue
-        parsed = parse_object(html, a["bm_id"], a.get("museum_number")) if html else None
-        if not parsed:
-            no_record += 1
+        filled = {"material": 0, "date_text": 0, "description": 0}
+        no_record = 0
+        for i, a in enumerate(todo, 1):
+            try:
+                html = get_page(fetcher, a["bm_id"])
+            except Exception as e:  # noqa: BLE001
+                print(f"  [{i}/{len(todo)}] {a['bm_id']}: fetch error: {e}")
+                continue
+            parsed = parse_object(html, a["bm_id"], a.get("museum_number")) if html else None
+            if not parsed:
+                no_record += 1
+            else:
+                for field in ("material", "date_text", "description"):
+                    if not a.get(field) and parsed.get(field):
+                        a[field] = parsed[field]
+                        filled[field] += 1
+            if i % 50 == 0:
+                print(f"  …{i}/{len(todo)}  filled so far: {filled}")
+                if not args.dry_run:  # checkpoint so progress survives a stop
+                    DATA.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
+
+        print(f"\nDone. Filled: {filled}. No record found for {no_record} objects.")
+        if args.dry_run:
+            print("Dry run — data/artifacts.json NOT written.")
         else:
-            for field in ("material", "date_text", "description"):
-                if not a.get(field) and parsed.get(field):
-                    a[field] = parsed[field]
-                    filled[field] += 1
-        if i % 50 == 0:
-            print(f"  …{i}/{len(todo)}  filled so far: {filled}")
-
-    print(f"\nDone. Filled: {filled}. No record found for {no_record} objects.")
-    if args.dry_run:
-        print("Dry run — data/artifacts.json NOT written.")
-    else:
-        DATA.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-        print(f"Wrote {DATA}")
+            DATA.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
+            print(f"Wrote {DATA}")
+    finally:
+        fetcher.close()
 
 
 if __name__ == "__main__":
