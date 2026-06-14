@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v19 — north-up globe view';
+const BUILD = 'v20 — open on front entrance';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -28,7 +28,7 @@ const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axi
 // Opening "hero" view: the camera looks AT the museum from an oblique angle.
 const VIEW_ELEV_DEG = 26;      // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
 const HERO_DIST = 15;          // camera distance from the building in the opening shot
-const ENTRANCE_HEADING_DEG = 90; // which face is the entrance — drives BOTH the opening view and the exit (try ±90 / 180)
+const ENTRANCE_HEADING_DEG = 270; // which face is the entrance — drives BOTH the opening view and the exit (try ±90 / 180)
 const EXIT_GATE = 0.16;        // fraction of each flight spent funnelling through the doorway
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
 const RETURN_SECS = 16;
