@@ -61,9 +61,10 @@ class Fetcher:
 
     PROFILE = BASE / "tools" / ".enrich_profile"
 
-    def __init__(self, headed=False, delay=1.0):
+    def __init__(self, headed=False, delay=1.0, channel="chrome"):
         self.headed = headed
         self.delay = delay
+        self.channel = channel
         self._pw = self._ctx = None
 
     def _ensure(self):
@@ -76,13 +77,20 @@ class Fetcher:
                 "Playwright is required:\n"
                 "  pip install playwright && playwright install chromium")
         self._pw = sync_playwright().start()
-        self._ctx = self._pw.chromium.launch_persistent_context(
-            str(self.PROFILE),
+        opts = dict(
             headless=not self.headed,
             user_agent=UA, locale="en-GB", timezone_id="Europe/London",
             viewport={"width": 1280, "height": 900},
             args=["--disable-blink-features=AutomationControlled"],
         )
+        # Prefer the real installed Google Chrome (clears Cloudflare far more
+        # reliably than bundled Chromium); fall back to Chromium if absent.
+        try:
+            self._ctx = self._pw.chromium.launch_persistent_context(
+                str(self.PROFILE), channel=self.channel, **opts)
+        except Exception:  # noqa: BLE001 - chrome channel not installed
+            self._ctx = self._pw.chromium.launch_persistent_context(
+                str(self.PROFILE), **opts)
         # Hide the most obvious automation tell from Cloudflare.
         self._ctx.add_init_script(
             "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
@@ -214,10 +222,13 @@ def main():
     ap.add_argument("--dump", metavar="BM_ID")
     ap.add_argument("--delay", type=float, default=1.0)
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--channel", default="chrome",
+                    help="browser channel: chrome (default), msedge, or '' for bundled Chromium")
     args = ap.parse_args()
 
     data = json.loads(DATA.read_text("utf-8"))
-    fetcher = Fetcher(headed=args.headed, delay=args.delay)
+    fetcher = Fetcher(headed=args.headed, delay=args.delay,
+                      channel=args.channel or None)
 
     try:
         if args.dump:
