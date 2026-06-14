@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v18 — face the entrance';
+const BUILD = 'v19 — north-up globe view';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -251,8 +251,10 @@ async function main() {
       .addScaledVector(entranceDir, Math.cos(elev)).normalize();
     return buildingTarget.clone().addScaledVector(dir, HERO_DIST);
   }
-  // Pulled-back globe overview over Bloomsbury, looking at the planet's centre.
-  const globePos = () => bmDir.clone().multiplyScalar(300);
+  // Pulled-back globe overview: a north-up, equatorial three-quarter shot that
+  // frames Europe–Africa–Asia. (Sitting straight over London put the camera on
+  // the polar axis, which read as a confusing top-down view.)
+  const globePos = () => latLngToV3(16, 12, 300);
   const HERO_RANGE = { min: 5, max: 90 };
   const GLOBE_RANGE = { min: 110, max: 480 };
   camera.position.copy(heroPos());
