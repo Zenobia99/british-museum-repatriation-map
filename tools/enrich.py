@@ -40,6 +40,7 @@ import argparse
 import json
 import re
 import time
+from html import unescape as html_unescape
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
@@ -49,15 +50,6 @@ OBJECT_URL = "https://www.britishmuseum.org/collection/object/{bm_id}"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
       "(KHTML, like Gecko) Version/17.0 Safari/605.1.15")
 DESC_MAX_CHARS = 300
-
-# Fields we are allowed to fill, mapped to the candidate keys we look for in
-# the British Museum page record. Edit the candidate lists if --dump shows the
-# real keys differ.
-FIELD_CANDIDATES = {
-    "description": ["description", "Description", "physicalDescription", "comment"],
-    "date_text": ["date", "productionDate", "production_date", "Date", "dateText"],
-    "material": ["material", "materials", "Materials", "Material", "medium"],
-}
 
 
 # --------------------------------------------------------------- networking
@@ -90,11 +82,11 @@ class Fetcher:
         page = self._ctx.new_page()
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            # Give Cloudflare's challenge + client render time to settle.
-            for _ in range(6):
+            # Wait out Cloudflare + client render until the detail list appears.
+            for _ in range(8):
                 html = page.content()
                 title = (page.title() or "").lower()
-                if "just a moment" not in title and "__NEXT_DATA__" in html:
+                if "just a moment" not in title and "object-detail__data-term" in html:
                     break
                 page.wait_for_timeout(2000)
             try:
@@ -131,68 +123,39 @@ def get_page(fetcher, bm_id):
 
 # --------------------------------------------------------------- parsing
 
-def extract_next_data(html):
-    """Pull the embedded __NEXT_DATA__ JSON blob the BM site ships."""
-    m = re.search(
-        r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
-    if not m:
-        return None
-    try:
-        return json.loads(m.group(1))
-    except json.JSONDecodeError:
-        return None
+# Each BM object field renders as:
+#   <div class="object-detail__data-item">
+#     <dt class="object-detail__data-term">Materials</dt>
+#     <dd class="object-detail__data-description">…</dd> [<dd>…</dd> …]
+#   </div>
+# We map the labels below onto our three fields (first match wins).
+LABELS = {
+    "description": ["Description"],
+    "date_text": ["Production date", "Date", "Cultures/periods"],
+    "material": ["Materials", "Material"],
+}
 
 
-def walk(node):
-    """Yield every dict in a nested JSON structure."""
-    if isinstance(node, dict):
-        yield node
-        for v in node.values():
-            yield from walk(v)
-    elif isinstance(node, list):
-        for v in node:
-            yield from walk(v)
+def strip_tags(s):
+    s = re.sub(r"<[^>]+>", " ", s)
+    s = html_unescape(s)
+    return re.sub(r"\s+", " ", s).strip()
 
 
-def find_record(blob, bm_id, museum_number):
-    """Heuristically locate the object's detail dict within the page blob."""
-    best, best_score = None, -1
-    needles = {bm_id, (museum_number or "").replace(" ", "")}
-    for d in walk(blob):
-        text = json.dumps(d, ensure_ascii=False)
-        score = 0
-        if any(n and n in text for n in needles):
-            score += 2
-        # Looks like an object record if it carries several detail-ish keys.
-        score += sum(1 for keys in FIELD_CANDIDATES.values()
-                     for k in keys if k in d)
-        if score > best_score:
-            best, best_score = d, score
-    return best if best_score >= 2 else None
-
-
-def as_text(value):
-    """Flatten a string / list / nested label dict into plain text."""
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value.strip()
-    if isinstance(value, list):
-        return ", ".join(t for t in (as_text(v) for v in value) if t)
-    if isinstance(value, dict):
-        for k in ("label", "name", "title", "value", "text"):
-            if k in value:
-                return as_text(value[k])
-    return ""
-
-
-def pick(record, field):
-    for key in FIELD_CANDIDATES[field]:
-        if key in record:
-            txt = as_text(record[key])
-            if txt:
-                return txt
-    return ""
+def parse_fields(doc):
+    """Return {label: value} for every detail row on the object page."""
+    fields = {}
+    for chunk in doc.split('<div class="object-detail__data-item">')[1:]:
+        mt = re.search(r'<dt class="object-detail__data-term">(.*?)</dt>', chunk, re.DOTALL)
+        if not mt:
+            continue
+        label = strip_tags(mt.group(1))
+        dds = re.findall(
+            r'<dd class="object-detail__data-description">(.*?)</dd>', chunk, re.DOTALL)
+        vals = [v for v in (strip_tags(d) for d in dds) if v]
+        if label and vals and label not in fields:
+            fields[label] = ", ".join(vals)
+    return fields
 
 
 def two_sentences(text):
@@ -206,18 +169,22 @@ def two_sentences(text):
     return out
 
 
-def parse_object(html, bm_id, museum_number):
-    blob = extract_next_data(html)
-    if blob is None:
+def parse_object(html):
+    fields = parse_fields(html)
+    if not fields:
         return None
-    record = find_record(blob, bm_id, museum_number)
-    if record is None:
-        return None
+
+    def first(label_keys):
+        for k in label_keys:
+            if fields.get(k):
+                return fields[k]
+        return ""
+
     return {
-        "description": two_sentences(pick(record, "description")),
-        "date_text": pick(record, "date_text"),
-        "material": pick(record, "material"),
-        "_record": record,
+        "description": two_sentences(first(LABELS["description"])),
+        "date_text": first(LABELS["date_text"]),
+        "material": first(LABELS["material"]),
+        "_fields": fields,
     }
 
 
@@ -246,21 +213,17 @@ def main():
             if not html:
                 print(f"No page for {args.dump} (404 or empty).")
                 return
-            a = next((x for x in data if x.get("bm_id") == args.dump), {})
-            parsed = parse_object(html, args.dump, a.get("museum_number"))
+            parsed = parse_object(html)
             if not parsed:
-                print("Could not locate the object record in __NEXT_DATA__.")
-                print(f"Rendered HTML saved to {saved}")
-                print("Send me that file and I'll fix the parser to match the page.")
+                print("No detail fields found (Cloudflare page or empty render).")
+                print(f"Rendered HTML saved to {saved} — send me that file.")
                 return
-            rec = parsed.pop("_record")
-            print("=== extracted fields ===")
+            fields = parsed.pop("_fields")
+            print("=== mapped (what will be written) ===")
             print(json.dumps(parsed, indent=2, ensure_ascii=False))
-            print("\n=== raw record keys ===")
-            print(sorted(rec.keys()))
-            print("\n=== raw record (first 2000 chars) ===")
-            print(json.dumps(rec, indent=2, ensure_ascii=False)[:2000])
-            print(f"\n(rendered HTML also saved to {saved})")
+            print("\n=== all BM fields on the page ===")
+            for k, v in fields.items():
+                print(f"  {k}: {v[:160]}")
             return
 
         todo = [a for a in data if needs_enrich(a) and a.get("bm_id")]
@@ -277,7 +240,7 @@ def main():
             except Exception as e:  # noqa: BLE001
                 print(f"  [{i}/{len(todo)}] {a['bm_id']}: fetch error: {e}")
                 continue
-            parsed = parse_object(html, a["bm_id"], a.get("museum_number")) if html else None
+            parsed = parse_object(html) if html else None
             if not parsed:
                 no_record += 1
             else:
