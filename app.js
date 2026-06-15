@@ -17,12 +17,12 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v24 — London, smaller';
+const BUILD = 'v25 — London, smaller still';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
 const BM = { lat: 51.5194, lng: -0.1269 }; // real London (Bloomsbury)
-const BUILDING_HEIGHT = 0.62; // how tall the museum model stands, in globe units (small enough to stay off France)
+const BUILDING_HEIGHT = 0.45; // how tall the museum model stands, in globe units (small enough to stay off France)
 const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
 
 // Opening "hero" view: the camera looks AT the museum from an oblique angle.
