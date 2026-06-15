@@ -17,11 +17,14 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v21 — object descriptions';
+const BUILD = 'v22 — museum nudged west';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
-const BM = { lat: 51.5194, lng: -0.1269 };
+// Museum display anchor. Real London is lng -0.13, but the model is large, so
+// it's nudged west (over the Bristol Channel) to keep its eastern edge off the
+// French/Belgian coast. Purely cosmetic — artefact origins are unaffected.
+const BM = { lat: 51.5194, lng: -4.5 };
 const BUILDING_HEIGHT = 0.9; // how tall the museum model stands, in globe units
 const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
 
