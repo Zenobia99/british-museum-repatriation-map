@@ -20,7 +20,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v29 — drop-in earth.jpg';
+const BUILD = 'v30 — brighter earth grade';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -342,11 +342,12 @@ async function main() {
         uniform sampler2D uTex;
         varying vec2 vUv; varying vec3 vN; varying vec3 vV;
         void main() {
-          // Dark blue marble — reads well zoomed out and during the migration.
+          // Show the base map fairly true-to-source (crisp, legible) with a
+          // gentle cool grade and a soft atmospheric rim at the limb.
           vec3 tex = texture2D(uTex, vUv).rgb;
-          vec3 col = pow(tex, vec3(1.15)) * vec3(0.42, 0.50, 0.62);
-          float fres = pow(1.0 - max(dot(vN, vV), 0.0), 2.6);
-          col += fres * vec3(0.16, 0.30, 0.52);
+          vec3 col = pow(tex, vec3(0.92)) * vec3(0.84, 0.90, 1.0);
+          float fres = pow(1.0 - max(dot(vN, vV), 0.0), 3.0);
+          col += fres * vec3(0.12, 0.22, 0.42);
           gl_FragColor = vec4(col, 1.0);
         }`,
     })
