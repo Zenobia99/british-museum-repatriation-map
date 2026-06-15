@@ -20,7 +20,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v32 — 8K earth base map';
+const BUILD = 'v33 — blue-marble globe, thin borders';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -388,20 +388,23 @@ async function main() {
     const b = new THREE.Vector3();
     for (const line of mesh.coordinates) {
       for (let i = 0; i < line.length - 1; i++) {
-        latLngToV3(line[i][1], line[i][0], R + 0.2, a);
-        latLngToV3(line[i + 1][1], line[i + 1][0], R + 0.2, b);
+        latLngToV3(line[i][1], line[i][0], R + 0.18, a);
+        latLngToV3(line[i + 1][1], line[i + 1][0], R + 0.18, b);
         verts.push(a.x, a.y, a.z, b.x, b.y, b.z);
       }
     }
-    // Line2 gives real, consistent line thickness (plain GL lines are 1px).
-    const bg = new LineSegmentsGeometry();
-    bg.setPositions(verts);
-    borderMat = new LineMaterial({
-      color: 0xbfd4f2, linewidth: 1.8, transparent: true, opacity: 0.72,
-      depthWrite: false,
-    });
-    borderMat.resolution.set(innerWidth, innerHeight);
-    scene.add(new LineSegments2(bg, borderMat));
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    scene.add(new THREE.LineSegments(
+      g,
+      new THREE.LineBasicMaterial({
+        color: 0x55688f,
+        transparent: true,
+        opacity: 0.38,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    ));
   } catch (e) {
     console.warn('borders skipped:', e);
   }
