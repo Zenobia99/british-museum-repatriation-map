@@ -13,11 +13,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v27 — blue marble + crisp borders';
+const BUILD = 'v28 — bold borders + labels + 50m';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -278,9 +281,22 @@ async function main() {
 
   /* ------------------------------------------------ data + textures */
 
+  // Prefer the higher-detail 50m borders if present (download once on a Mac:
+  // curl -L -o data/countries-50m.json https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json),
+  // else fall back to the bundled 110m set.
+  const loadCountries = async () => {
+    for (const f of ['data/countries-50m.json', 'data/countries-110m.json']) {
+      try {
+        const r = await fetch(f);
+        if (r.ok) { const j = await r.json(); bootTick('Tracing borders…'); console.log('[Return Them Home] borders from', f); return j; }
+      } catch { /* try next */ }
+    }
+    throw new Error('no countries topojson found');
+  };
+
   const [artifacts, world, earthTex, ...atlasTex] = await Promise.all([
     loadJSON('data/artifacts.json', 'Reading the ledger…'),
-    loadJSON('data/countries-110m.json', 'Tracing borders…'),
+    loadCountries(),
     loadTexture('assets/earth-blue-marble.jpg', 'Painting the earth…'),
     ...[0, 1, 2, 3, 4].map((i) =>
       loadTexture(`assets/bm/atlas/atlas_${i}.jpg`, 'Photographing 5,000 objects…')
@@ -354,6 +370,7 @@ async function main() {
 
   // Vector country borders — crisp at any zoom (no pixelation), bright enough
   // to read on land and sea so countries are identifiable. Never fatal.
+  let borderMat = null;
   try {
     const mesh = topojson.mesh(world, world.objects.countries);
     const verts = [];
@@ -366,19 +383,84 @@ async function main() {
         verts.push(a.x, a.y, a.z, b.x, b.y, b.z);
       }
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    scene.add(new THREE.LineSegments(
-      g,
-      new THREE.LineBasicMaterial({
-        color: 0xbfd4f2,
-        transparent: true,
-        opacity: 0.7,
-        depthWrite: false,
-      })
-    ));
+    // Line2 gives real, consistent line thickness (plain GL lines are 1px).
+    const bg = new LineSegmentsGeometry();
+    bg.setPositions(verts);
+    borderMat = new LineMaterial({
+      color: 0xbfd4f2, linewidth: 1.8, transparent: true, opacity: 0.72,
+      depthWrite: false,
+    });
+    borderMat.resolution.set(innerWidth, innerHeight);
+    scene.add(new LineSegments2(bg, borderMat));
   } catch (e) {
     console.warn('borders skipped:', e);
+  }
+
+  // Country name labels — vector text sprites (always crisp). They appear only
+  // when zoomed in (to avoid a cluttered overview) and only on the near side of
+  // the globe. Built once; visibility updated per frame. Never fatal.
+  const labelGroup = new THREE.Group();
+  const labelDirs = [];
+  try {
+    const feats = topojson.feature(world, world.objects.countries).features;
+
+    // Representative point: centroid of the country's largest ring (avoids
+    // dateline/multi-part skew for places like the USA or Russia).
+    const repPoint = (geom) => {
+      const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
+      let best = null, bestLen = -1;
+      for (const poly of polys) {
+        const ring = poly[0];
+        if (ring && ring.length > bestLen) { bestLen = ring.length; best = ring; }
+      }
+      if (!best) return null;
+      let x = 0, y = 0;
+      for (const [lng, lat] of best) { x += lng; y += lat; }
+      return [x / best.length, y / best.length];
+    };
+
+    const makeLabel = (text) => {
+      const fs = 44, pad = 10;
+      const c = document.createElement('canvas');
+      const ctx = c.getContext('2d');
+      const font = `600 ${fs}px "Spline Sans Mono", monospace`;
+      ctx.font = font;
+      c.width = Math.ceil(ctx.measureText(text).width) + pad * 2;
+      c.height = fs + pad * 2;
+      ctx.font = font;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = 'rgba(4,6,13,0.9)';
+      ctx.fillStyle = '#eaf1ff';
+      ctx.strokeText(text, c.width / 2, c.height / 2);
+      ctx.fillText(text, c.width / 2, c.height / 2);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: tex, transparent: true, depthTest: true, depthWrite: false,
+      }));
+      const h = 3.0; // world height; sizeAttenuation keeps it ~screen-stable in the zoom range
+      sp.scale.set(h * (c.width / c.height), h, 1);
+      return sp;
+    };
+
+    const tmpL = new THREE.Vector3();
+    for (const f of feats) {
+      const name = f.properties && f.properties.name;
+      const rp = name && repPoint(f.geometry);
+      if (!rp) continue;
+      const sp = makeLabel(name);
+      latLngToV3(rp[1], rp[0], R + 1.2, tmpL);
+      sp.position.copy(tmpL);
+      sp.renderOrder = 3;
+      labelGroup.add(sp);
+      labelDirs.push(tmpL.clone().normalize());
+    }
+    labelGroup.visible = false;
+    scene.add(labelGroup);
+  } catch (e) {
+    console.warn('labels skipped:', e);
   }
 
   // Starfield
@@ -904,6 +986,7 @@ async function main() {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
+    if (borderMat) borderMat.resolution.set(innerWidth, innerHeight);
   });
 
   const clock = new THREE.Clock();
@@ -967,6 +1050,20 @@ async function main() {
 
     controls.autoRotate = wantRotate && (phase === 'home' || phase === 'returning') && !pointer.downAt;
     controls.update();
+
+    // Country labels: only when zoomed in past the overview, and only on the
+    // near hemisphere (keeps the global view uncluttered, regional views legible).
+    if (labelGroup.children.length) {
+      const camLen = camera.position.length();
+      const show = camLen < 245;
+      labelGroup.visible = show;
+      if (show) {
+        const camDir = camera.position.clone().normalize();
+        for (let i = 0; i < labelDirs.length; i++) {
+          labelGroup.children[i].visible = labelDirs[i].dot(camDir) > 0.32;
+        }
+      }
+    }
 
     if (pointer.moved) { pointer.moved = false; pick(); }
 
