@@ -29,8 +29,8 @@ const BUILDING_HEIGHT = 0.45; // how tall the museum model stands, in globe unit
 const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
 
 // Opening "hero" view: the camera looks AT the museum from an oblique angle.
-const VIEW_ELEV_DEG = 36;      // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
-const HERO_DIST = 48;          // camera distance from the building in the opening shot
+const VIEW_ELEV_DEG = 26;      // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
+const HERO_DIST = 15;          // camera distance from the building in the opening shot
 const ENTRANCE_HEADING_DEG = 270; // which face is the entrance — drives BOTH the opening view and the exit (try ±90 / 180)
 const EXIT_GATE = 0.16;        // fraction of each flight spent funnelling through the doorway
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
@@ -294,10 +294,10 @@ async function main() {
     throw new Error('no countries topojson found');
   };
 
-  // Drop-in high-res base map: put your chosen equirectangular (2:1) texture at
-  // assets/earth.jpg and it's used automatically; else the bundled blue marble.
+  // Bundled dark "blue marble" base map — deep navy oceans, calm land. A
+  // higher-res drop-in at assets/earth.jpg is used only as a fallback.
   const loadEarth = async () => {
-    for (const f of ['assets/earth.jpg', 'assets/earth-blue-marble.jpg']) {
+    for (const f of ['assets/earth-blue-marble.jpg', 'assets/earth.jpg']) {
       try { const t = await loadTexture(f, 'Painting the earth…'); console.log('[Return Them Home] earth from', f); return t; } catch { /* next */ }
     }
     throw new Error('no earth texture');
@@ -345,9 +345,9 @@ async function main() {
           // Show the base map fairly true-to-source (crisp, legible) with a
           // gentle cool grade and a soft atmospheric rim at the limb.
           vec3 tex = texture2D(uTex, vUv).rgb;
-          vec3 col = pow(tex, vec3(1.05)) * vec3(0.55, 0.62, 0.72);
-          float fres = pow(1.0 - max(dot(vN, vV), 0.0), 3.0);
-          col += fres * vec3(0.08, 0.16, 0.32);
+          vec3 col = pow(tex, vec3(1.15)) * vec3(0.42, 0.50, 0.62);
+          float fres = pow(1.0 - max(dot(vN, vV), 0.0), 2.6);
+          col += fres * vec3(0.16, 0.30, 0.52);
           gl_FragColor = vec4(col, 1.0);
         }`,
     })
