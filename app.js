@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v25 — London, smaller still';
+const BUILD = 'v26 — Esri topo globe';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -281,7 +281,7 @@ async function main() {
   const [artifacts, world, earthTex, ...atlasTex] = await Promise.all([
     loadJSON('data/artifacts.json', 'Reading the ledger…'),
     loadJSON('data/countries-110m.json', 'Tracing borders…'),
-    loadTexture('assets/earth-blue-marble.jpg', 'Painting the earth…'),
+    loadTexture(lite ? 'assets/earth-blue-marble.jpg' : 'assets/earth-esri-topo.jpg', 'Painting the earth…'),
     ...[0, 1, 2, 3, 4].map((i) =>
       loadTexture(`assets/bm/atlas/atlas_${i}.jpg`, 'Photographing 5,000 objects…')
     ),
@@ -317,10 +317,12 @@ async function main() {
         uniform sampler2D uTex;
         varying vec2 vUv; varying vec3 vN; varying vec3 vV;
         void main() {
+          // Show the topographic map true to source (crisp borders/labels),
+          // with a touch of contrast and a soft atmospheric rim at the limb.
           vec3 tex = texture2D(uTex, vUv).rgb;
-          vec3 col = pow(tex, vec3(1.15)) * vec3(0.42, 0.50, 0.62);
-          float fres = pow(1.0 - max(dot(vN, vV), 0.0), 2.6);
-          col += fres * vec3(0.16, 0.30, 0.52);
+          vec3 col = clamp((tex - 0.5) * 1.07 + 0.5, 0.0, 1.0);
+          float fres = pow(1.0 - max(dot(vN, vV), 0.0), 3.5);
+          col = mix(col, vec3(0.66, 0.80, 0.98), fres * 0.45);
           gl_FragColor = vec4(col, 1.0);
         }`,
     })
