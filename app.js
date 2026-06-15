@@ -17,7 +17,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v26 — Esri topo globe';
+const BUILD = 'v27 — blue marble + crisp borders';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -281,7 +281,7 @@ async function main() {
   const [artifacts, world, earthTex, ...atlasTex] = await Promise.all([
     loadJSON('data/artifacts.json', 'Reading the ledger…'),
     loadJSON('data/countries-110m.json', 'Tracing borders…'),
-    loadTexture(lite ? 'assets/earth-blue-marble.jpg' : 'assets/earth-esri-topo.jpg', 'Painting the earth…'),
+    loadTexture('assets/earth-blue-marble.jpg', 'Painting the earth…'),
     ...[0, 1, 2, 3, 4].map((i) =>
       loadTexture(`assets/bm/atlas/atlas_${i}.jpg`, 'Photographing 5,000 objects…')
     ),
@@ -317,12 +317,11 @@ async function main() {
         uniform sampler2D uTex;
         varying vec2 vUv; varying vec3 vN; varying vec3 vV;
         void main() {
-          // Show the topographic map true to source (crisp borders/labels),
-          // with a touch of contrast and a soft atmospheric rim at the limb.
+          // Dark blue marble — reads well zoomed out and during the migration.
           vec3 tex = texture2D(uTex, vUv).rgb;
-          vec3 col = clamp((tex - 0.5) * 1.07 + 0.5, 0.0, 1.0);
-          float fres = pow(1.0 - max(dot(vN, vV), 0.0), 3.5);
-          col = mix(col, vec3(0.66, 0.80, 0.98), fres * 0.45);
+          vec3 col = pow(tex, vec3(1.15)) * vec3(0.42, 0.50, 0.62);
+          float fres = pow(1.0 - max(dot(vN, vV), 0.0), 2.6);
+          col += fres * vec3(0.16, 0.30, 0.52);
           gl_FragColor = vec4(col, 1.0);
         }`,
     })
@@ -353,7 +352,8 @@ async function main() {
   );
   if (!lite) scene.add(halo);
 
-  // Country borders as faint luminous lines (decorative — never fatal)
+  // Vector country borders — crisp at any zoom (no pixelation), bright enough
+  // to read on land and sea so countries are identifiable. Never fatal.
   try {
     const mesh = topojson.mesh(world, world.objects.countries);
     const verts = [];
@@ -361,8 +361,8 @@ async function main() {
     const b = new THREE.Vector3();
     for (const line of mesh.coordinates) {
       for (let i = 0; i < line.length - 1; i++) {
-        latLngToV3(line[i][1], line[i][0], R + 0.18, a);
-        latLngToV3(line[i + 1][1], line[i + 1][0], R + 0.18, b);
+        latLngToV3(line[i][1], line[i][0], R + 0.2, a);
+        latLngToV3(line[i + 1][1], line[i + 1][0], R + 0.2, b);
         verts.push(a.x, a.y, a.z, b.x, b.y, b.z);
       }
     }
@@ -371,10 +371,9 @@ async function main() {
     scene.add(new THREE.LineSegments(
       g,
       new THREE.LineBasicMaterial({
-        color: 0x55688f,
+        color: 0xbfd4f2,
         transparent: true,
-        opacity: 0.38,
-        blending: THREE.AdditiveBlending,
+        opacity: 0.7,
         depthWrite: false,
       })
     ));
