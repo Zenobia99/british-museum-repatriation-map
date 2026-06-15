@@ -17,15 +17,12 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v23 — museum at -3 lng';
+const BUILD = 'v24 — London, smaller';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
-// Museum display anchor. Real London is lng -0.13, but the model is large, so
-// it's nudged west (over the Bristol Channel) to keep its eastern edge off the
-// French/Belgian coast. Purely cosmetic — artefact origins are unaffected.
-const BM = { lat: 51.5194, lng: -3.0 };
-const BUILDING_HEIGHT = 0.9; // how tall the museum model stands, in globe units
+const BM = { lat: 51.5194, lng: -0.1269 }; // real London (Bloomsbury)
+const BUILDING_HEIGHT = 0.62; // how tall the museum model stands, in globe units (small enough to stay off France)
 const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
 
 // Opening "hero" view: the camera looks AT the museum from an oblique angle.
