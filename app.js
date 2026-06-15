@@ -29,8 +29,8 @@ const BUILDING_HEIGHT = 0.45; // how tall the museum model stands, in globe unit
 const BUILDING_YAW = Math.PI / 2; // radians: spin the building about its up axis to aim the facade
 
 // Opening "hero" view: the camera looks AT the museum from an oblique angle.
-const VIEW_ELEV_DEG = 26;      // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
-const HERO_DIST = 15;          // camera distance from the building in the opening shot
+const VIEW_ELEV_DEG = 36;      // elevation above the local horizon: 0 = eye-level on the facade, 90 = top-down
+const HERO_DIST = 48;          // camera distance from the building in the opening shot
 const ENTRANCE_HEADING_DEG = 270; // which face is the entrance — drives BOTH the opening view and the exit (try ±90 / 180)
 const EXIT_GATE = 0.16;        // fraction of each flight spent funnelling through the doorway
 const STAGGER = 6.0; // flight spread: each object flies for 1/(1+S) of the run
@@ -345,9 +345,9 @@ async function main() {
           // Show the base map fairly true-to-source (crisp, legible) with a
           // gentle cool grade and a soft atmospheric rim at the limb.
           vec3 tex = texture2D(uTex, vUv).rgb;
-          vec3 col = pow(tex, vec3(0.92)) * vec3(0.84, 0.90, 1.0);
+          vec3 col = pow(tex, vec3(1.05)) * vec3(0.55, 0.62, 0.72);
           float fres = pow(1.0 - max(dot(vN, vV), 0.0), 3.0);
-          col += fres * vec3(0.12, 0.22, 0.42);
+          col += fres * vec3(0.08, 0.16, 0.32);
           gl_FragColor = vec4(col, 1.0);
         }`,
     })
@@ -406,72 +406,9 @@ async function main() {
     console.warn('borders skipped:', e);
   }
 
-  // Country name labels — vector text sprites (always crisp). They appear only
-  // when zoomed in (to avoid a cluttered overview) and only on the near side of
-  // the globe. Built once; visibility updated per frame. Never fatal.
+  // Country labels disabled — borders alone carry the geography.
   const labelGroup = new THREE.Group();
   const labelDirs = [];
-  try {
-    const feats = topojson.feature(world, world.objects.countries).features;
-
-    // Representative point: centroid of the country's largest ring (avoids
-    // dateline/multi-part skew for places like the USA or Russia).
-    const repPoint = (geom) => {
-      const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
-      let best = null, bestLen = -1;
-      for (const poly of polys) {
-        const ring = poly[0];
-        if (ring && ring.length > bestLen) { bestLen = ring.length; best = ring; }
-      }
-      if (!best) return null;
-      let x = 0, y = 0;
-      for (const [lng, lat] of best) { x += lng; y += lat; }
-      return [x / best.length, y / best.length];
-    };
-
-    const makeLabel = (text) => {
-      const fs = 44, pad = 10;
-      const c = document.createElement('canvas');
-      const ctx = c.getContext('2d');
-      const font = `600 ${fs}px "Spline Sans Mono", monospace`;
-      ctx.font = font;
-      c.width = Math.ceil(ctx.measureText(text).width) + pad * 2;
-      c.height = fs + pad * 2;
-      ctx.font = font;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineWidth = 7;
-      ctx.strokeStyle = 'rgba(4,6,13,0.9)';
-      ctx.fillStyle = '#eaf1ff';
-      ctx.strokeText(text, c.width / 2, c.height / 2);
-      ctx.fillText(text, c.width / 2, c.height / 2);
-      const tex = new THREE.CanvasTexture(c);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: tex, transparent: true, depthTest: true, depthWrite: false,
-      }));
-      const h = 3.0; // world height; sizeAttenuation keeps it ~screen-stable in the zoom range
-      sp.scale.set(h * (c.width / c.height), h, 1);
-      return sp;
-    };
-
-    const tmpL = new THREE.Vector3();
-    for (const f of feats) {
-      const name = f.properties && f.properties.name;
-      const rp = name && repPoint(f.geometry);
-      if (!rp) continue;
-      const sp = makeLabel(name);
-      latLngToV3(rp[1], rp[0], R + 1.2, tmpL);
-      sp.position.copy(tmpL);
-      sp.renderOrder = 3;
-      labelGroup.add(sp);
-      labelDirs.push(tmpL.clone().normalize());
-    }
-    labelGroup.visible = false;
-    scene.add(labelGroup);
-  } catch (e) {
-    console.warn('labels skipped:', e);
-  }
 
   // Starfield
   {
