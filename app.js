@@ -20,7 +20,7 @@ import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
 
-const BUILD = 'v28 — bold borders + labels + 50m';
+const BUILD = 'v29 — drop-in earth.jpg';
 console.log('%c[Return Them Home] build ' + BUILD, 'color:#e8b14a;font-weight:bold');
 
 const R = 100;
@@ -294,10 +294,19 @@ async function main() {
     throw new Error('no countries topojson found');
   };
 
+  // Drop-in high-res base map: put your chosen equirectangular (2:1) texture at
+  // assets/earth.jpg and it's used automatically; else the bundled blue marble.
+  const loadEarth = async () => {
+    for (const f of ['assets/earth.jpg', 'assets/earth-blue-marble.jpg']) {
+      try { const t = await loadTexture(f, 'Painting the earth…'); console.log('[Return Them Home] earth from', f); return t; } catch { /* next */ }
+    }
+    throw new Error('no earth texture');
+  };
+
   const [artifacts, world, earthTex, ...atlasTex] = await Promise.all([
     loadJSON('data/artifacts.json', 'Reading the ledger…'),
     loadCountries(),
-    loadTexture('assets/earth-blue-marble.jpg', 'Painting the earth…'),
+    loadEarth(),
     ...[0, 1, 2, 3, 4].map((i) =>
       loadTexture(`assets/bm/atlas/atlas_${i}.jpg`, 'Photographing 5,000 objects…')
     ),
