@@ -8,41 +8,40 @@ import { Story } from './story.js';
 
 // Cesium Ion powers world-scale satellite imagery and terrain. The token is
 // read from the environment (VITE_CESIUM_ION_TOKEN) — never hard-coded, never
-// committed. Copy .env.example to .env.local and drop your token in.
-// Without a token we fall back to token-free imagery so the app still runs.
+// committed. Without a token we fall back to token-free imagery.
 const ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN;
 const hasIon = typeof ION_TOKEN === 'string' && ION_TOKEN.length > 0;
-if (hasIon) {
-  Cesium.Ion.defaultAccessToken = ION_TOKEN;
-} else {
-  console.warn(
-    '[return-them-home] No VITE_CESIUM_ION_TOKEN set — falling back to ' +
-    'token-free OpenStreetMap imagery and a plain ellipsoid (no terrain). ' +
-    'Add a token in .env.local for photoreal satellite imagery + terrain.'
+if (hasIon) Cesium.Ion.defaultAccessToken = ION_TOKEN;
+
+// Surface fatal errors on screen instead of failing silently to a blank page.
+function showError(msg) {
+  let el = document.getElementById('fatal');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fatal';
+    el.style.cssText =
+      'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);' +
+      'z-index:9999;max-width:560px;background:rgba(40,10,10,0.92);' +
+      'border:1px solid #a33;border-radius:10px;padding:20px 24px;' +
+      'font:14px/1.5 monospace;color:#ffd;white-space:pre-wrap;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+}
+
+function addOpenStreetMap(viewer) {
+  viewer.imageryLayers.addImageryProvider(
+    new Cesium.OpenStreetMapImageryProvider({
+      url: 'https://tile.openstreetmap.org/',
+    })
   );
 }
 
 async function init() {
+  // Build the viewer with NO base layer so construction can't fail on a flaky
+  // imagery/terrain provider; we add those afterwards, each guarded.
   const viewer = new Cesium.Viewer('cesiumContainer', {
-    // Photoreal base: world terrain + aerial imagery when Ion is available.
-    terrain: hasIon
-      ? Cesium.Terrain.fromWorldTerrain({
-          requestVertexNormals: true,
-          requestWaterMask: true,
-        })
-      : undefined,
-    baseLayer: hasIon
-      ? Cesium.ImageryLayer.fromProviderAsync(
-          Cesium.createWorldImageryAsync({
-            style: Cesium.IonWorldImageryStyle.AERIAL,
-          })
-        )
-      : new Cesium.ImageryLayer(
-          new Cesium.OpenStreetMapImageryProvider({
-            url: 'https://tile.openstreetmap.org/',
-          })
-        ),
-    // Strip the UI chrome for a cinematic frame.
+    baseLayer: false,
     fullscreenButton: false,
     homeButton: false,
     sceneModePicker: false,
@@ -56,6 +55,40 @@ async function init() {
     navigationInstructionsInitiallyVisible: false,
     scene3DOnly: true,
   });
+  window.viewer = viewer;
+
+  // Report any later render-loop error on screen (Cesium halts on these).
+  viewer.scene.renderError.addEventListener((scene, err) => {
+    showError('Render error:\n' + (err && err.message ? err.message : err));
+  });
+
+  // Imagery + terrain, each guarded so neither can blank the globe.
+  if (hasIon) {
+    try {
+      const imagery = await Cesium.createWorldImageryAsync({
+        style: Cesium.IonWorldImageryStyle.AERIAL,
+      });
+      viewer.imageryLayers.addImageryProvider(imagery);
+    } catch (e) {
+      console.warn('[return-them-home] world imagery failed, using OSM:', e);
+      addOpenStreetMap(viewer);
+    }
+    try {
+      viewer.scene.setTerrain(
+        Cesium.Terrain.fromWorldTerrain({
+          requestVertexNormals: true,
+          requestWaterMask: true,
+        })
+      );
+    } catch (e) {
+      console.warn('[return-them-home] world terrain failed:', e);
+    }
+  } else {
+    console.warn(
+      '[return-them-home] No VITE_CESIUM_ION_TOKEN — using OpenStreetMap imagery.'
+    );
+    addOpenStreetMap(viewer);
+  }
 
   // Cinematic atmosphere.
   const scene = viewer.scene;
@@ -64,11 +97,10 @@ async function init() {
   scene.sun.show = true;
   scene.moon.show = true;
   scene.fog.enabled = true;
-  // Hide the default Cesium ion watermark/credit container clutter.
   viewer.cesiumWidget.creditContainer.style.display = 'none';
 
-  // Phase 1: seat the real British Museum at Bloomsbury and open on the
-  // hero view. The repatriation animation (Phases 3-4) builds on top of this.
+  // Phase 1: seat the real British Museum at Bloomsbury and open on the hero
+  // view.
   await addMuseum(viewer);
   flyToHeroView(viewer, /* animate */ false);
 
@@ -77,8 +109,8 @@ async function init() {
   const groups = buildPositions(artifacts);
   const discs = addPhotoDiscs(viewer, groups);
 
-  // Phase 3: the narrative. Open with everything piled on the museum, then
-  // stream the objects home (or gather them back) on the buttons.
+  // Phase 3: the narrative. Open piled on the museum, stream home / gather on
+  // the buttons.
   const story = new Story(viewer, discs);
   story.pileNow();
   document
@@ -88,12 +120,11 @@ async function init() {
     .getElementById('btn-gather')
     .addEventListener('click', () => story.gather());
 
-  // Expose for console debugging during development.
-  window.viewer = viewer;
   window.discs = discs;
   window.story = story;
 }
 
 init().catch((err) => {
   console.error('[return-them-home] init failed:', err);
+  showError('Startup failed:\n' + (err && err.stack ? err.stack : err));
 });
