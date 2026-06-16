@@ -177,7 +177,7 @@ export class PhotoDiscs {
   constructor(scene, groups) {
     this.prog = 1.0; // 0 = piled at the museum, 1 = home. Starts home.
     this.reverse = 0.0; // 0 = museum->home, 1 = home->museum
-    this.pxSize = 7.0; // disc radius in pixels
+    this.pxSize = 4.5; // disc radius in pixels
     this.opacity = 1.0; // global fade (used for the clean closing frame)
     this.aspect = 1.0; // x-axis size correction for true circles
     this._batches = groups.map(

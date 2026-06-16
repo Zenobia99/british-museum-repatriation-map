@@ -6,6 +6,7 @@ import { addBordersAndLabels } from './borders.js';
 import { loadArtifacts, buildPositions } from './artifacts/data.js';
 import { addPhotoDiscs } from './artifacts/discs.js';
 import { Story } from './story.js';
+import { mountDevPanel } from './devpanel.js';
 
 // Cesium Ion powers world-scale satellite imagery and terrain. The token is
 // read from the environment (VITE_CESIUM_ION_TOKEN) — never hard-coded, never
@@ -133,6 +134,11 @@ async function init() {
   // Console helpers for framing the entrance shot live.
   window.logCam = () => logCam(viewer);
   window.flyToEntrance = () => flyToEntrance(viewer);
+
+  // On-screen tuning panel (sliders + camera readout) when ?dev=1 is in the URL.
+  if (new URLSearchParams(location.search).has('dev')) {
+    mountDevPanel(viewer, discs, story);
+  }
 }
 
 init().catch((err) => {
