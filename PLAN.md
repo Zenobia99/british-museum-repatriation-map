@@ -8,6 +8,13 @@ Decisions locked in:
 - **Engine:** standardize on CesiumJS.
 - **Build:** adopt Vite (drop the no-build import-map setup).
 - **Repo creation:** planning only for now — nothing new created or pushed.
+- **Hardware baseline:** Apple Mac mini (M4) class. This 3D experience is
+  meant to be cinematic; lower-functioning hardware falls back to the
+  existing 2D map (the reason for moving to Cesium in the first place).
+- **Payload:** the 15MB model + atlas payload is acceptable for GitHub Pages.
+  No low-res proxy models / no low-poly fallbacks.
+- **Pull-back:** keep the photoreal building visible during the global
+  pull-back (do not fade it to a stylized marker).
 
 ---
 
@@ -92,9 +99,16 @@ equivalent:
 - Precision: set the primitive `modelMatrix` to an Earth-centered frame and
   keep RTC offsets in floats — fine at disc scale and pull-back distance;
   close-up framing is handled by the photoreal model, not the discs.
-- Reuse the 5 x 2048px atlas sheets unchanged as bound textures.
-- Fallback if perf disappoints on low-end GPUs: `BillboardCollection` along
-  precomputed geodesic samples.
+- Reuse the 5 x 2048px atlas sheets unchanged as bound textures. These are a
+  separate render pass from the Cesium imagery/terrain/model, so they cannot
+  degrade the photoreal views — they only affect the discs themselves. At
+  ~64px per tile the discs are crisp at the pile/arc/mid-far framing they are
+  actually seen at; full-res images already live in the detail card. On the
+  M4 baseline with no payload limit, we can optionally regenerate the atlas at
+  higher resolution (e.g. 4096px sheets -> ~128px tiles) for sharper discs.
+  "Reuse unchanged" is the default; "regenerate sharper" is a free upgrade.
+- No GPU fallback path for the discs — the M4 baseline carries the custom
+  Primitive; lower hardware uses the separate 2D map instead.
 
 ## Fixes to make while merging (found in repo 2)
 1. Hardcoded Cesium Ion token in `index.html` -> move to a Vite env var
@@ -118,8 +132,9 @@ equivalent:
 5. **Polish** — calibration UI behind `?dev=1`, token/env hardening, deploy
    config, README.
 
-## Open questions for build time (not blocking)
-- Keep the photoreal building visible during the global pull-back, or fade to
-  a stylized marker once zoomed out?
-- Is the 15MB model + atlas payload acceptable for GitHub Pages, or do we want
-  a low-res proxy that swaps in on zoom?
+## Resolved
+- Photoreal building stays visible through the global pull-back.
+- 15MB model + atlas payload accepted for GitHub Pages; no low-res proxies.
+- Atlas reused unchanged by default; optional higher-res regen available on
+  the M4 baseline. Discs never degrade the photoreal views (separate pass).
+- M4 hardware baseline; lower hardware falls back to the 2D map.
