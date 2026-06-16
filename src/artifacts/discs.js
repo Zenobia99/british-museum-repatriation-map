@@ -173,7 +173,7 @@ export class PhotoDiscs {
   constructor(scene, groups) {
     this.prog = 1.0; // 0 = piled at the museum, 1 = home. Starts home.
     this.reverse = 0.0; // 0 = museum->home, 1 = home->museum
-    this.pxSize = 5.0; // disc radius in pixels
+    this.pxSize = 11.0; // disc radius in pixels
     this._batches = groups.map(
       (g) =>
         new SheetBatch(

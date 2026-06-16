@@ -6,7 +6,7 @@ import { feature } from 'topojson-client';
 // (visible over terrain); labels sit at each country's largest-landmass
 // centroid and fade in/out by distance so they don't clutter the globe.
 
-const BORDER_COLOR = Cesium.Color.fromCssColorString('#a9c0d6').withAlpha(0.5);
+const BORDER_COLOR = Cesium.Color.fromCssColorString('#5d6f80').withAlpha(0.38);
 
 // Planar (lng/lat) ring area + centroid — fine for picking a label anchor.
 function ringAreaAndCentroid(ring) {
@@ -54,9 +54,9 @@ export async function addBordersAndLabels(viewer) {
         ds.entities.add({
           polyline: {
             positions,
-            width: 1.4,
+            width: 0.8,
             clampToGround: true,
-            material: BORDER_COLOR,
+            material: new Cesium.ColorMaterialProperty(BORDER_COLOR),
           },
         });
       }
@@ -73,18 +73,21 @@ export async function addBordersAndLabels(viewer) {
         position: Cesium.Cartesian3.fromDegrees(best[0], best[1]),
         label: {
           text: name,
-          font: '600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fillColor: Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.BLACK.withAlpha(0.85),
-          outlineWidth: 3,
+          font: '700 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fillColor: Cesium.Color.fromCssColorString('#f4f7fa'),
+          outlineColor: Cesium.Color.BLACK.withAlpha(0.9),
+          outlineWidth: 3.5,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: Cesium.Color.BLACK.withAlpha(0.35),
+          backgroundPadding: new Cesium.Cartesian2(7, 4),
           verticalOrigin: Cesium.VerticalOrigin.CENTER,
           horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-          // Show from the surface out to a wide view; fade with distance.
-          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0.0, 2.0e7),
-          translucencyByDistance: new Cesium.NearFarScalar(1.5e6, 1.0, 1.9e7, 0.0),
-          scaleByDistance: new Cesium.NearFarScalar(1.5e6, 1.0, 1.7e7, 0.55),
+          // Stay legible across the whole pull-out range; only gently fade.
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0.0, 2.6e7),
+          translucencyByDistance: new Cesium.NearFarScalar(3.0e6, 1.0, 2.6e7, 0.45),
+          scaleByDistance: new Cesium.NearFarScalar(3.0e6, 1.1, 2.0e7, 0.6),
         },
       });
     }

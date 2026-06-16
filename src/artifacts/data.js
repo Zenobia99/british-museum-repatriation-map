@@ -1,15 +1,16 @@
 import * as Cesium from 'cesium';
 import { MUSEUM, museumAnchor } from '../museum.js';
 
-// Atlas layout (from data/atlas_manifest.json): 5 sheets, 2048px each, packed
-// with 64px tiles -> 32x32 = 1024 tiles per sheet. Each object carries a
-// pre-baked { atlas_index, u, v } where (u,v) is the normalised top-left of
-// its tile. The per-tile UV span is therefore 64/2048.
+// Atlas layout: 5 sheets, 4096px each, packed with 128px tiles -> 32x32 =
+// 1024 tiles per sheet. Each object carries a pre-baked { atlas_index, u, v }
+// where (u,v) is the normalised top-left of its tile. Because (u,v) are
+// normalised, the per-tile UV span (128/4096) is identical to the original
+// 64/2048 packing — the higher-res sheets are a pure drop-in.
 export const ATLAS = {
   sheets: 5,
-  atlasSize: 2048,
-  tileSize: 64,
-  tileScale: 64 / 2048, // 0.03125
+  atlasSize: 4096,
+  tileSize: 128,
+  tileScale: 128 / 4096, // 0.03125
   sheetUrl: (i) => `${import.meta.env.BASE_URL}atlas/atlas_${i}.jpg`,
 };
 
