@@ -14,9 +14,12 @@ export const ATLAS = {
   sheetUrl: (i) => `${import.meta.env.BASE_URL}atlas/atlas_${i}.jpg`,
 };
 
-// Altitude (metres) at which the discs hover above their home coordinates,
-// so they read clearly and clear the terrain. Negligible at globe scale.
-const HOME_ALT = 6000;
+// Altitude (metres) at which the discs hover above their home coordinates.
+// Kept low: a high anchor looks fine top-down but, at an oblique angle, its
+// apparent ground position shifts sideways (parallax) — which made coastal
+// artefacts appear to drift out to sea. Low enough to sit on their country,
+// high enough to clear the terrain and read clearly.
+const HOME_ALT = 1200;
 
 // Pile geometry around the museum, in local east-north-up metres. A compact
 // gaussian swarm hugging the building so artefacts read as leaving it.
