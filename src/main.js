@@ -8,6 +8,17 @@ import { addPhotoDiscs } from './artifacts/discs.js';
 import { Story } from './story.js';
 import { initExplore } from './explore.js';
 
+// Visible build stamp so it's obvious which version is actually running
+// (defeats stale dev-server / service-worker confusion).
+const BUILD = 'v6 — controllable close + label cull + year pass';
+console.log(`%c[Return Them Home] build ${BUILD}`, 'color:#e8b24a;font-weight:bold');
+window.addEventListener('DOMContentLoaded', () => {
+  const stamp = document.createElement('div');
+  stamp.id = 'build-stamp';
+  stamp.textContent = BUILD;
+  document.body.appendChild(stamp);
+});
+
 // Cesium Ion powers world-scale satellite imagery and terrain. The token is
 // read from the environment (VITE_CESIUM_ION_TOKEN) — never hard-coded, never
 // committed. Without a token we fall back to token-free imagery.

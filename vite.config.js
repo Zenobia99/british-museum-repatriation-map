@@ -9,7 +9,7 @@ export default defineConfig({
   base: '/return-them-home/',
   plugins: [cesium()],
   server: {
-    port: 5176,
+    port: 5180,
     host: '0.0.0.0',
   },
   build: {
