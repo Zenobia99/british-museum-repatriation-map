@@ -26,7 +26,9 @@ export class Story {
 
   // A wide view that frames Europe-Africa-Asia so most arcs are visible.
   flyGlobal(duration = 3.5) {
-    this.viewer.camera.flyTo({
+    const cam = this.viewer.camera;
+    cam.cancelFlight(); // avoid overlapping flights leaving input disabled
+    cam.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(12.0, 28.0, this.globalHeight),
       orientation: {
         heading: 0.0,
@@ -34,7 +36,14 @@ export class Story {
         roll: 0.0,
       },
       duration,
+      // Always hand control back, regardless of flyTo's internal save/restore.
+      complete: () => this._enableControls(),
+      cancel: () => this._enableControls(),
     });
+  }
+
+  _enableControls() {
+    this.viewer.scene.screenSpaceCameraController.enableInputs = true;
   }
 
   // Tween the global disc opacity (clean closing frame).

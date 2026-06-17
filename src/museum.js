@@ -73,10 +73,23 @@ export function museumAnchor() {
 
 export function flyToHeroView(viewer, animate = true) {
   if (animate) {
-    viewer.camera.flyTo({ ...HERO_VIEW, duration: 3.0 });
+    viewer.camera.cancelFlight();
+    viewer.camera.flyTo({
+      ...HERO_VIEW,
+      duration: 3.0,
+      complete: () => enableControls(viewer),
+      cancel: () => enableControls(viewer),
+    });
   } else {
     viewer.camera.setView(HERO_VIEW);
   }
+}
+
+// Cesium's flyTo disables camera input during a flight and restores it on
+// completion; overlapping flights can leave it stuck off. Always force input
+// back on when a flight ends so the final frame is controllable.
+function enableControls(viewer) {
+  viewer.scene.screenSpaceCameraController.enableInputs = true;
 }
 
 // Street-level framing of the entrance, in east-north-up metres around the
@@ -113,10 +126,13 @@ export function flyToEntrance(viewer, duration = 4.5) {
   );
   const up = ellipsoid.geodeticSurfaceNormal(camPos, new Cesium.Cartesian3());
 
+  viewer.camera.cancelFlight();
   viewer.camera.flyTo({
     destination: camPos,
     orientation: { direction, up },
     duration,
+    complete: () => enableControls(viewer),
+    cancel: () => enableControls(viewer),
   });
 }
 
