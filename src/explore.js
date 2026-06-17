@@ -34,7 +34,7 @@ function styleThumb(el, art) {
   el.style.backgroundPosition = `-${u * sheet}px -${v * sheet}px`;
 }
 
-export function initExplore(viewer, artifacts) {
+export function initExplore(viewer, artifacts, discList, discs) {
   const scene = viewer.scene;
 
   // Group artefacts by display country.
@@ -154,10 +154,49 @@ export function initExplore(viewer, artifacts) {
     return null;
   }
 
+  // The disc's resting world position, matching the shader: at prog~0 it sits
+  // at `from`, at prog~1 at `to` (from/to swap with reverse). Mid-flight the
+  // discs are moving along arcs, so picking is disabled then.
+  const discWin = new Cesium.Cartesian2();
+  function discRestPosition(d) {
+    if (discs.prog > 0.99) return discs.reverse ? d.museum : d.home;
+    if (discs.prog < 0.01) return discs.reverse ? d.home : d.museum;
+    return null;
+  }
+  function discAt(x, y) {
+    if (discs.prog > 0.01 && discs.prog < 0.99) return null; // mid-flight
+    const thresh = discs.pxSize + 5;
+    let best = null;
+    let bestD2 = thresh * thresh;
+    for (const d of discList) {
+      const pos = discRestPosition(d);
+      if (!pos || !occluder.isPointVisible(pos)) continue;
+      const p = Cesium.SceneTransforms.worldToWindowCoordinates(
+        scene,
+        pos,
+        discWin
+      );
+      if (!p) continue;
+      const dx = p.x - x;
+      const dy = p.y - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = d;
+      }
+    }
+    return best;
+  }
+
   const handler = viewer.screenSpaceEventHandler;
   handler.setInputAction((movement) => {
     const L = labelAt(movement.position.x, movement.position.y);
-    if (L) openCountry(L.group);
+    if (L) {
+      openCountry(L.group);
+      return;
+    }
+    const d = discAt(movement.position.x, movement.position.y);
+    if (d) openDetail(artifacts[d.index]);
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
   let hovered = null;

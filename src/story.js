@@ -8,20 +8,23 @@ function easeInOutSine(x) {
   return -(Math.cos(Math.PI * x) - 1) / 2;
 }
 
-// Drives the disc progress uniform and the camera through the narrative.
-// Phase 3 covers the two core passes:
-//   returnHome() — stream the artefacts out of the pile to their origins
-//   gather()     — reverse: pull them back to the British Museum
+// Drives the disc progress uniform and the camera through the narrative:
+//   returnHome()  — stream the artefacts out of the pile to their origins
+//   watchTaken()  — reverse, ordered by acquisition year, with a year ticker
+//   gather()      — reverse by distance, pulled back to the museum
 export class Story {
-  constructor(viewer, discs) {
+  constructor(viewer, discs, yearRange) {
     this.viewer = viewer;
     this.discs = discs;
-    this.phase = 'museum'; // museum | returning | home | gathering
+    this.yearRange = yearRange || { min: 1800, max: 2000 };
+    this.phase = 'museum'; // museum | returning | home | taking | gathering
     this._raf = 0;
-    // Altitude of the pulled-back world view (metres). Closer than a full
-    // earth-from-space shot so the satellite imagery still reads. Tweakable
-    // live via `story.globalHeight`.
     this.globalHeight = 1.45e7;
+
+    // Year ticker overlay (shown during "watch how they were taken").
+    this.ticker = document.createElement('div');
+    this.ticker.id = 'year-ticker';
+    document.body.appendChild(this.ticker);
   }
 
   // A wide view that frames Europe-Africa-Asia so most arcs are visible.
@@ -59,15 +62,17 @@ export class Story {
     this._fadeRaf = requestAnimationFrame(tick);
   }
 
-  _run(reverse, onDone) {
+  _run(reverse, useTake, onDone, onProgress) {
     cancelAnimationFrame(this._raf);
     this.discs.reverse = reverse;
+    this.discs.useTake = useTake;
     this.discs.opacity = 1.0; // ensure discs are visible for the run
     this.discs.prog = 0; // snap to the start (pile end of this direction)
     const t0 = performance.now();
     const tick = () => {
       const raw = Math.min((performance.now() - t0) / (RUN_SECS * 1000), 1);
       this.discs.prog = easeInOutSine(raw);
+      if (onProgress) onProgress(this.discs.prog);
       if (raw < 1) {
         this._raf = requestAnimationFrame(tick);
       } else if (onDone) {
@@ -78,38 +83,57 @@ export class Story {
   }
 
   // Pile -> origins. Ends on the pulled-back global view so the viewer can
-  // explore the dispersed discs and open their detail cards. (No descent here
-  // — the street-level entrance is the closing beat of the gather pass.)
+  // explore the dispersed discs and open their detail cards.
   returnHome() {
     this.phase = 'returning';
     this.flyGlobal();
-    this._run(0.0, () => {
+    this._run(0.0, 0.0, () => {
       this.phase = 'home';
     });
   }
 
-  // Origins -> pile (fly back to the museum). When everything is back in the
-  // pile, fly the camera home to the British Museum and then descend to a
-  // street-level view of the entrance — the closing shot.
+  // Origins -> pile, ordered by acquisition year, with a year ticker counting
+  // up 1600 -> 2025 as the wave arrives — "watch how they were taken". Ends
+  // back at the museum entrance.
+  watchTaken() {
+    this.phase = 'taking';
+    this.flyGlobal();
+    this.ticker.classList.add('show');
+    this._run(
+      1.0,
+      1.0,
+      () => this._closeOnMuseum(),
+      (prog) => {
+        const { min, max } = this.yearRange;
+        this.ticker.textContent = String(Math.round(min + (max - min) * prog));
+      }
+    );
+  }
+
+  // Origins -> pile by distance, pulled back to the museum.
   gather() {
     this.phase = 'gathering';
     this.flyGlobal();
-    this._run(1.0, () => {
-      this.phase = 'museum';
-      flyToHeroView(this.viewer, /* animate */ true); // fly back to the museum
-      setTimeout(() => {
-        flyToEntrance(this.viewer); // descend to the entrance
-        // The artefacts are back in the collection — fade the pile out so the
-        // closing entrance frame is a clean shot of the building.
-        this._fadeDiscs(0.0, 3.5);
-      }, 3200);
-    });
+    this._run(1.0, 0.0, () => this._closeOnMuseum());
+  }
+
+  // Shared closing beat: back to the museum, descend to the entrance, fade the
+  // pile out for a clean final frame, hide the ticker.
+  _closeOnMuseum() {
+    this.phase = 'museum';
+    this.ticker.classList.remove('show');
+    flyToHeroView(this.viewer, /* animate */ true);
+    setTimeout(() => {
+      flyToEntrance(this.viewer);
+      this._fadeDiscs(0.0, 3.5);
+    }, 3200);
   }
 
   // Snap to the piled state at the museum without animating (opening shot).
   pileNow() {
     cancelAnimationFrame(this._raf);
     this.discs.reverse = 0;
+    this.discs.useTake = 0;
     this.discs.prog = 0;
     this.phase = 'museum';
   }

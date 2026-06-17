@@ -51,6 +51,16 @@ export async function loadArtifacts() {
   return res.json();
 }
 
+// Acquisition year, parsed from the British Museum registration number
+// (e.g. "1888,0601.716" -> 1888). Returns null if no plausible year is found.
+export function parseAcqYear(museumNumber) {
+  if (!museumNumber) return null;
+  const m = String(museumNumber).match(/(1[5-9]\d{2}|20\d{2})/);
+  if (!m) return null;
+  const y = parseInt(m[1], 10);
+  return y >= 1500 && y <= 2025 ? y : null;
+}
+
 // Build the per-object world positions in ECEF:
 //  - home:   the object's true origin coordinate, lifted to HOME_ALT.
 //  - museum: a slot in the pile hugging the British Museum at Bloomsbury.
@@ -109,13 +119,21 @@ export function buildPositions(artifacts) {
       u: a.atlas.u,
       v: a.atlas.v,
       index: i,
-      ord: 0, // filled in below once all distances are known
+      ord: 0, // by distance — filled in below
+      ordTake: 0, // by acquisition year — filled in below
     };
     groups[a.atlas.atlas_index].push(disc);
-    flat.push({ disc, dist: Cesium.Cartesian3.distance(home, anchor) });
+    const acqYear = parseAcqYear(a.museum_number);
+    flat.push({
+      disc,
+      dist: Cesium.Cartesian3.distance(home, anchor),
+      // Objects with no parseable year sort last in the acquisition timeline.
+      year: acqYear == null ? 9999 : acqYear,
+      hasYear: acqYear != null,
+    });
   });
 
-  // Flight order: nearest origins leave the pile first, so the swarm ripples
+  // Return order: nearest origins leave the pile first, so the swarm ripples
   // outward. ord is normalised to [0,1]; the shader staggers each flight by it.
   flat.sort((p, q) => p.dist - q.dist);
   const last = Math.max(flat.length - 1, 1);
@@ -123,7 +141,21 @@ export function buildPositions(artifacts) {
     p.disc.ord = rank / last;
   });
 
-  return groups;
+  // Acquisition order: earliest registrations first (for "how they were
+  // taken"). ordTake is also normalised to [0,1].
+  flat.sort((p, q) => p.year - q.year);
+  flat.forEach((p, rank) => {
+    p.disc.ordTake = rank / last;
+  });
+
+  // Year range across artefacts that actually carry a parseable year.
+  const years = flat.filter((p) => p.hasYear).map((p) => p.year);
+  const yearRange = {
+    min: years.length ? Math.min(...years) : 1800,
+    max: years.length ? Math.max(...years) : 2000,
+  };
+
+  return { groups, yearRange };
 }
 
 export { MUSEUM };

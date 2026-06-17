@@ -116,19 +116,25 @@ async function init() {
 
   // Phase 2: load the 5,000 artefacts and render them as photo-discs.
   const artifacts = await loadArtifacts();
-  const groups = buildPositions(artifacts);
+  const { groups, yearRange } = buildPositions(artifacts);
   const discs = addPhotoDiscs(viewer, groups);
 
-  // Phase 4: clickable country labels -> thumbnail panel -> detail card.
-  initExplore(viewer, artifacts);
-
-  // Phase 3: the narrative. Open piled on the museum, stream home / gather on
-  // the buttons.
-  const story = new Story(viewer, discs);
+  // Phase 3: the narrative. Open piled on the museum; stream home / watch how
+  // they were taken / gather on the buttons.
+  const story = new Story(viewer, discs, yearRange);
   story.pileNow();
+
+  // Phase 4: clickable country labels + disc clicks -> thumbnail panel /
+  // detail card. The flat disc list (with home/museum positions) is passed so
+  // discs can be picked at rest.
+  initExplore(viewer, artifacts, groups.flat(), discs);
+
   document
     .getElementById('btn-return')
     .addEventListener('click', () => story.returnHome());
+  document
+    .getElementById('btn-taken')
+    .addEventListener('click', () => story.watchTaken());
   document
     .getElementById('btn-gather')
     .addEventListener('click', () => story.gather());

@@ -17,7 +17,8 @@
 export const DISC_VERTEX = /* glsl */ `
 in vec3 aHome;     // ECEF position at the origin country
 in vec3 aMuseum;   // ECEF position in the Bloomsbury pile
-in float aOrd;     // flight order in [0,1]
+in float aOrd;     // flight order by distance [0,1]
+in float aOrdTake; // flight order by acquisition year [0,1]
 in vec2 aCorner;   // quad corner in [-1, 1]
 in vec2 aUv;       // atlas UV at this corner
 
@@ -25,6 +26,7 @@ uniform float u_prog;     // 0 = piled, 1 = home
 uniform float u_pxSize;   // disc radius in pixels
 uniform float u_reverse;  // 0 = museum->home, 1 = home->museum
 uniform float u_aspect;   // x-axis size correction (1.0 = none)
+uniform float u_useTake;  // 0 = order by distance, 1 = order by acquisition year
 
 out vec2 v_uv;
 out vec2 v_local;
@@ -53,7 +55,8 @@ vec3 arcPoint(vec3 p0, vec3 p1, float t) {
 }
 
 void main() {
-  float t = clamp(u_prog * (1.0 + S) - aOrd * S, 0.0, 1.0);
+  float ord = mix(aOrd, aOrdTake, u_useTake);
+  float t = clamp(u_prog * (1.0 + S) - ord * S, 0.0, 1.0);
 
   vec3 from = mix(aMuseum, aHome, u_reverse);
   vec3 to   = mix(aHome, aMuseum, u_reverse);
