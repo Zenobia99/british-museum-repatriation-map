@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium';
-import { flyToHeroView, flyToEntrance } from './museum.js';
+import { flyToEntrance } from './museum.js';
 
 // Length of a full run (pile -> home, or home -> pile), in seconds.
 const RUN_SECS = 16;
@@ -117,16 +117,15 @@ export class Story {
     this._run(1.0, 0.0, () => this._closeOnMuseum());
   }
 
-  // Shared closing beat: back to the museum, descend to the entrance, fade the
-  // pile out for a clean final frame, hide the ticker.
+  // Shared closing beat: fly back to the museum entrance in a single flight
+  // (a single flight avoids overlapping-flight input locks), fade the pile out
+  // for a clean final frame, hide the ticker. Controls are handed back when
+  // the flight completes (see flyToEntrance).
   _closeOnMuseum() {
     this.phase = 'museum';
     this.ticker.classList.remove('show');
-    flyToHeroView(this.viewer, /* animate */ true);
-    setTimeout(() => {
-      flyToEntrance(this.viewer);
-      this._fadeDiscs(0.0, 3.5);
-    }, 3200);
+    flyToEntrance(this.viewer);
+    this._fadeDiscs(0.0, 3.5);
   }
 
   // Snap to the piled state at the museum without animating (opening shot).

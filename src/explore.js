@@ -107,16 +107,30 @@ export function initExplore(viewer, artifacts, discList, discs) {
     scene.camera.positionWC
   );
   const win = new Cesium.Cartesian2();
+  const toLabel = new Cesium.Cartesian3();
+
+  function hide(L) {
+    if (L.visible) {
+      L.el.style.display = 'none';
+      L.visible = false;
+    }
+  }
 
   scene.postRender.addEventListener(() => {
-    const tooFar = scene.camera.positionCartographic.height > LABEL_MAX_HEIGHT;
-    occluder.cameraPosition = scene.camera.positionWC;
+    const cam = scene.camera;
+    const tooFar = cam.positionCartographic.height > LABEL_MAX_HEIGHT;
+    occluder.cameraPosition = cam.positionWC;
+    const w = scene.canvas.clientWidth;
+    const h = scene.canvas.clientHeight;
     for (const L of labels) {
+      // Cull: zoomed too far, occluded by the globe, or behind the camera.
       if (tooFar || !occluder.isPointVisible(L.position)) {
-        if (L.visible) {
-          L.el.style.display = 'none';
-          L.visible = false;
-        }
+        hide(L);
+        continue;
+      }
+      Cesium.Cartesian3.subtract(L.position, cam.positionWC, toLabel);
+      if (Cesium.Cartesian3.dot(toLabel, cam.directionWC) <= 0) {
+        hide(L);
         continue;
       }
       const p = Cesium.SceneTransforms.worldToWindowCoordinates(
@@ -124,11 +138,9 @@ export function initExplore(viewer, artifacts, discList, discs) {
         L.position,
         win
       );
-      if (!p) {
-        if (L.visible) {
-          L.el.style.display = 'none';
-          L.visible = false;
-        }
+      // Cull anything that projects off-screen (or to NaN).
+      if (!p || !(p.x >= 0 && p.x <= w && p.y >= 0 && p.y <= h)) {
+        hide(L);
         continue;
       }
       if (!L.visible) {
@@ -210,7 +222,12 @@ export function initExplore(viewer, artifacts, discList, discs) {
     }
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-  return { groups, openCountry };
+  function closeUI() {
+    panel.classList.remove('open');
+    card.root.classList.remove('open');
+  }
+
+  return { groups, openCountry, closeUI };
 }
 
 // ---- DOM builders ------------------------------------------------------

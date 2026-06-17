@@ -96,6 +96,13 @@ async function init() {
   const scene = viewer.scene;
   scene.msaaSamples = 4; // smoother building/border/disc geometry edges
   scene.globe.enableLighting = true;
+
+  // Camera controls: allow zooming in close to the building and far out, and
+  // don't let terrain-collision wedge the camera so it can always be moved.
+  const ctrl = scene.screenSpaceCameraController;
+  ctrl.minimumZoomDistance = 2.0;
+  ctrl.maximumZoomDistance = 4.0e7;
+  ctrl.enableCollisionDetection = false;
   scene.skyAtmosphere.show = true;
   scene.sun.show = true;
   scene.moon.show = true;
@@ -127,17 +134,22 @@ async function init() {
   // Phase 4: clickable country labels + disc clicks -> thumbnail panel /
   // detail card. The flat disc list (with home/museum positions) is passed so
   // discs can be picked at rest.
-  initExplore(viewer, artifacts, groups.flat(), discs);
+  const explore = initExplore(viewer, artifacts, groups.flat(), discs);
 
+  // Starting a new pass closes any open panel/card so stale UI doesn't linger.
+  const run = (fn) => () => {
+    explore.closeUI();
+    fn();
+  };
   document
     .getElementById('btn-return')
-    .addEventListener('click', () => story.returnHome());
+    .addEventListener('click', run(() => story.returnHome()));
   document
     .getElementById('btn-taken')
-    .addEventListener('click', () => story.watchTaken());
+    .addEventListener('click', run(() => story.watchTaken()));
   document
     .getElementById('btn-gather')
-    .addEventListener('click', () => story.gather());
+    .addEventListener('click', run(() => story.gather()));
 
   window.discs = discs;
   window.story = story;
