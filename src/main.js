@@ -2,11 +2,12 @@ import './style.css';
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { addMuseum, flyToHeroView, flyToEntrance, logCam } from './museum.js';
-import { addBordersAndLabels } from './borders.js';
+import { addBorders } from './borders.js';
 import { loadArtifacts, buildPositions } from './artifacts/data.js';
 import { addPhotoDiscs } from './artifacts/discs.js';
 import { Story } from './story.js';
 import { mountDevPanel } from './devpanel.js';
+import { initExplore } from './explore.js';
 
 // Cesium Ion powers world-scale satellite imagery and terrain. The token is
 // read from the environment (VITE_CESIUM_ION_TOKEN) — never hard-coded, never
@@ -107,17 +108,20 @@ async function init() {
   await addMuseum(viewer);
   flyToHeroView(viewer, /* animate */ false);
 
-  // Country borders + name labels (Natural Earth 110m), guarded.
+  // Country borders (Natural Earth 110m), guarded.
   try {
-    await addBordersAndLabels(viewer);
+    await addBorders(viewer);
   } catch (e) {
-    console.warn('[return-them-home] borders/labels failed:', e);
+    console.warn('[return-them-home] borders failed:', e);
   }
 
   // Phase 2: load the 5,000 artefacts and render them as photo-discs.
   const artifacts = await loadArtifacts();
   const groups = buildPositions(artifacts);
   const discs = addPhotoDiscs(viewer, groups);
+
+  // Phase 4: clickable country labels -> thumbnail panel -> detail card.
+  initExplore(viewer, artifacts);
 
   // Phase 3: the narrative. Open piled on the museum, stream home / gather on
   // the buttons.
