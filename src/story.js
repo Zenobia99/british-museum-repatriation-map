@@ -11,7 +11,7 @@ function easeInOutSine(x) {
 // Drives the disc progress uniform and the camera through the narrative:
 //   returnHome()  — stream the artefacts out of the pile to their origins
 //   watchTaken()  — reverse, ordered by acquisition year, with a year ticker
-//   gather()      — reverse by distance, pulled back to the museum
+//   resetExperience() — re-pile and return to the opening view
 export class Story {
   constructor(viewer, discs, yearRange) {
     this.viewer = viewer;
@@ -112,12 +112,6 @@ export class Story {
     );
   }
 
-  // Origins -> pile by distance, pulled back to the museum.
-  gather() {
-    this.phase = 'gathering';
-    this.flyGlobal();
-    this._run(1.0, 0.0, () => this._closeOnMuseum());
-  }
   // Shared closing beat: fly back to the comfortable oblique museum view in a
   // single flight (avoids overlapping-flight input locks and stays high enough
   // for normal orbit/zoom controls), fade the pile out for a clean final
