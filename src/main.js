@@ -8,10 +8,11 @@ import { addPhotoDiscs } from './artifacts/discs.js';
 import { Story } from './story.js';
 import { initExplore } from './explore.js';
 import { mountCameraControls } from './controls.js';
+import { addGoogleTiles } from './tiles.js';
 
 // Visible build stamp so it's obvious which version is actually running
 // (defeats stale dev-server / service-worker confusion).
-const BUILD = 'v11 — tilt + north reset';
+const BUILD = 'v12 — Google 3D Tiles';
 console.log(`%c[Return Them Home] build ${BUILD}`, 'color:#e8b24a;font-weight:bold');
 window.addEventListener('DOMContentLoaded', () => {
   const stamp = document.createElement('div');
@@ -120,6 +121,11 @@ async function init() {
   scene.moon.show = true;
   scene.fog.enabled = true;
   viewer.cesiumWidget.creditContainer.style.display = 'none';
+
+  // Photorealistic 3D Tiles for a convincing street-level view (hides the
+  // imagery globe when available; otherwise we keep the draped imagery added
+  // above).
+  await addGoogleTiles(viewer);
 
   // Phase 1: seat the real British Museum at Bloomsbury and open on the
   // comfortable oblique museum view (orbit/zoom controls available).
