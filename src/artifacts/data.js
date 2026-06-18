@@ -169,3 +169,21 @@ export function buildPositions(artifacts, pileBaseHeight = PILE_BASE_H) {
 }
 
 export { MUSEUM };
+
+// The pile's local frame (ECEF centre + east/north/up unit axes) at a given
+// base height — used both to build the pile and to drive the live dev tuning.
+export function pileFrame(pileBaseHeight = PILE_BASE_H) {
+  const m = Cesium.Transforms.eastNorthUpToFixedFrame(
+    Cesium.Cartesian3.fromDegrees(MUSEUM.lon, MUSEUM.lat, pileBaseHeight)
+  );
+  const col = (i) => {
+    const c = Cesium.Matrix4.getColumn(m, i, new Cesium.Cartesian4());
+    return new Cesium.Cartesian3(c.x, c.y, c.z);
+  };
+  return {
+    center: Cesium.Matrix4.getTranslation(m, new Cesium.Cartesian3()),
+    east: col(0),
+    north: col(1),
+    up: col(2),
+  };
+}

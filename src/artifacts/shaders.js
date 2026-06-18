@@ -28,6 +28,16 @@ uniform float u_reverse;  // 0 = museum->home, 1 = home->museum
 uniform float u_aspect;   // x-axis size correction (1.0 = none)
 uniform float u_useTake;  // 0 = order by distance, 1 = order by acquisition year
 
+// Live pile tuning (dev panel): reposition/scale the pile around its centre
+// in the museum's east-north-up frame without rebuilding the buffers.
+uniform vec3 u_pileCenter;
+uniform vec3 u_eAxis;
+uniform vec3 u_nAxis;
+uniform vec3 u_uAxis;
+uniform vec3 u_pileShift;  // ECEF offset
+uniform float u_pileSpread; // horizontal scale (1 = unchanged)
+uniform float u_pileRise;   // vertical scale (1 = unchanged)
+
 out vec2 v_uv;
 out vec2 v_local;
 out float v_flight;   // 1 while airborne, for the fragment warm-up
@@ -58,8 +68,17 @@ void main() {
   float ord = mix(aOrd, aOrdTake, u_useTake);
   float t = clamp(u_prog * (1.0 + S) - ord * S, 0.0, 1.0);
 
-  vec3 from = mix(aMuseum, aHome, u_reverse);
-  vec3 to   = mix(aHome, aMuseum, u_reverse);
+  // Apply live pile tuning: decompose the pile slot into the museum ENU frame,
+  // scale, then add the offset. With spread=rise=1 and shift=0 this is exactly
+  // aMuseum (identity).
+  vec3 rel = aMuseum - u_pileCenter;
+  float e = dot(rel, u_eAxis) * u_pileSpread;
+  float n = dot(rel, u_nAxis) * u_pileSpread;
+  float u = dot(rel, u_uAxis) * u_pileRise;
+  vec3 mus = u_pileCenter + e * u_eAxis + n * u_nAxis + u * u_uAxis + u_pileShift;
+
+  vec3 from = mix(mus, aHome, u_reverse);
+  vec3 to   = mix(aHome, mus, u_reverse);
   vec3 worldPos = arcPoint(from, to, t);
 
   v_flight = step(0.0001, t) * step(t, 0.9999);

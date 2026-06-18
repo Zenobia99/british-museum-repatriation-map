@@ -158,6 +158,13 @@ class SheetBatch {
           u_opacity: () => o.opacity,
           u_aspect: () => o.aspect,
           u_useTake: () => o.useTake,
+          u_pileCenter: () => o.pileFrame.center,
+          u_eAxis: () => o.pileFrame.east,
+          u_nAxis: () => o.pileFrame.north,
+          u_uAxis: () => o.pileFrame.up,
+          u_pileShift: () => o.pileShift,
+          u_pileSpread: () => o.pileSpread,
+          u_pileRise: () => o.pileRise,
           u_atlas: () => self._texture,
         },
       });
@@ -182,13 +189,23 @@ class SheetBatch {
 // shared `time` (0 = pile, 1 = home) and `pxSize` controls, and loads the
 // atlas textures asynchronously.
 export class PhotoDiscs {
-  constructor(scene, groups) {
+  constructor(scene, groups, pileFrame) {
     this.prog = 1.0; // 0 = piled at the museum, 1 = home. Starts home.
     this.reverse = 0.0; // 0 = museum->home, 1 = home->museum
     this.pxSize = 4.5; // disc radius in pixels
     this.opacity = 1.0; // global fade (used for the clean closing frame)
     this.aspect = 1.0; // x-axis size correction for true circles
     this.useTake = 0.0; // 0 = order by distance, 1 = by acquisition year
+    // Live pile tuning (dev panel). Identity by default.
+    this.pileFrame = pileFrame || {
+      center: Cesium.Cartesian3.ZERO,
+      east: Cesium.Cartesian3.UNIT_X,
+      north: Cesium.Cartesian3.UNIT_Y,
+      up: Cesium.Cartesian3.UNIT_Z,
+    };
+    this.pileShift = new Cesium.Cartesian3(0, 0, 0);
+    this.pileSpread = 1.0;
+    this.pileRise = 1.0;
     this._batches = groups.map((g) => new SheetBatch(g, this));
     this._loadTextures(scene.context);
   }
@@ -236,8 +253,8 @@ export class PhotoDiscs {
 }
 
 // Convenience: build positions, create the primitive, add it to the scene.
-export function addPhotoDiscs(viewer, groups) {
-  const discs = new PhotoDiscs(viewer.scene, groups);
+export function addPhotoDiscs(viewer, groups, pileFrame) {
+  const discs = new PhotoDiscs(viewer.scene, groups, pileFrame);
   viewer.scene.primitives.add(discs);
   return discs;
 }

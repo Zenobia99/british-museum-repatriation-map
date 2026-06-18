@@ -289,3 +289,24 @@ html, body {
   font-size: 15px;
   font-weight: 700;
 }
+
+/* Pile tuning panel (?dev=1) */
+#pile-tuner {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 60;
+  width: 250px;
+  background: rgba(16, 18, 22, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #e8eaed;
+  backdrop-filter: blur(6px);
+}
+#pile-tuner .pt-title { font-weight: 700; margin-bottom: 8px; color: #e8b24a; }
+#pile-tuner label { display: grid; grid-template-columns: 54px 1fr 40px; align-items: center; gap: 6px; margin-bottom: 6px; }
+#pile-tuner input[type="range"] { width: 100%; }
+#pile-tuner span { text-align: right; color: #e8b24a; font-variant-numeric: tabular-nums; }
+#pile-tuner .pt-out { margin-top: 8px; font: 11px/1.4 monospace; color: #cfe; white-space: pre-wrap; }

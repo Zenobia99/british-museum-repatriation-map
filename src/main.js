@@ -3,8 +3,9 @@ import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { MUSEUM, flyToMuseum, logCam } from './museum.js';
 import { addBorders } from './borders.js';
-import { loadArtifacts, buildPositions } from './artifacts/data.js';
+import { loadArtifacts, buildPositions, pileFrame } from './artifacts/data.js';
 import { addPhotoDiscs } from './artifacts/discs.js';
+import { mountPileTuner } from './piletune.js';
 import { Story } from './story.js';
 import { initExplore } from './explore.js';
 import { mountCameraControls } from './controls.js';
@@ -12,7 +13,7 @@ import { addGoogleTiles } from './tiles.js';
 
 // Visible build stamp so it's obvious which version is actually running
 // (defeats stale dev-server / service-worker confusion).
-const BUILD = 'v16 — pile east+closer';
+const BUILD = 'v17 — pile tuner (?dev=1)';
 console.log(`%c[Return Them Home] build ${BUILD}`, 'color:#e8b24a;font-weight:bold');
 window.addEventListener('DOMContentLoaded', () => {
   const stamp = document.createElement('div');
@@ -153,7 +154,7 @@ async function init() {
   // Phase 2: load the 5,000 artefacts and render them as photo-discs.
   const artifacts = await loadArtifacts();
   const { groups, yearRange } = buildPositions(artifacts, pileBase);
-  const discs = addPhotoDiscs(viewer, groups);
+  const discs = addPhotoDiscs(viewer, groups, pileFrame(pileBase));
 
   // Phase 3: the narrative. Open piled on the museum; stream home / watch how
   // they were taken / gather on the buttons.
@@ -182,6 +183,11 @@ async function init() {
 
   // Persistent zoom/rotate controls, available in every section of the app.
   mountCameraControls(viewer);
+
+  // Pile tuning sliders when ?dev=1 is in the URL.
+  if (new URLSearchParams(location.search).has('dev')) {
+    mountPileTuner(discs);
+  }
 
   window.discs = discs;
   window.story = story;
