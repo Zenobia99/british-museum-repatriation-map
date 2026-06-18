@@ -13,7 +13,7 @@ import { addGoogleTiles } from './tiles.js';
 
 // Visible build stamp so it's obvious which version is actually running
 // (defeats stale dev-server / service-worker confusion).
-const BUILD = 'v18 — pile baked';
+const BUILD = 'v19 — baked opening view';
 console.log(`%c[Return Them Home] build ${BUILD}`, 'color:#e8b24a;font-weight:bold');
 window.addEventListener('DOMContentLoaded', () => {
   const stamp = document.createElement('div');

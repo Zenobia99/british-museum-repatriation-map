@@ -85,27 +85,34 @@ export function flyToHeroView(viewer, animate = true) {
   }
 }
 
-// A comfortable oblique view that frames the museum from ~1.5 km up. Using
-// flyToBoundingSphere (rather than a hard-coded near-ground pose) keeps the
-// camera high enough that the normal orbit/zoom globe controls apply — so the
-// opening and closing feel the same as exploring the globe, and the camera
-// can't end up under the terrain.
-const MUSEUM_FRAME = { heading: 35, pitch: -34, range: 1900 };
+// The opening/closing framing — a hand-picked front-on view of the museum
+// with the pile in the Great Court (captured via logCam). High enough that
+// the normal orbit/zoom globe controls apply.
+export const OPENING_VIEW = {
+  destination: Cesium.Cartesian3.fromDegrees(
+    -0.12427339830198514,
+    51.517174368264655,
+    175.76778338385463
+  ),
+  orientation: {
+    heading: Cesium.Math.toRadians(329.0028),
+    pitch: Cesium.Math.toRadians(-22.0035),
+    roll: 0.0,
+  },
+};
 
 export function flyToMuseum(viewer, animate = true) {
-  const center = Cesium.Cartesian3.fromDegrees(MUSEUM.lon, MUSEUM.lat, 30);
-  const sphere = new Cesium.BoundingSphere(center, 220);
   viewer.camera.cancelFlight();
-  viewer.camera.flyToBoundingSphere(sphere, {
-    offset: new Cesium.HeadingPitchRange(
-      Cesium.Math.toRadians(MUSEUM_FRAME.heading),
-      Cesium.Math.toRadians(MUSEUM_FRAME.pitch),
-      MUSEUM_FRAME.range
-    ),
-    duration: animate ? 3.0 : 0,
-    complete: () => enableControls(viewer),
-    cancel: () => enableControls(viewer),
-  });
+  if (animate) {
+    viewer.camera.flyTo({
+      ...OPENING_VIEW,
+      duration: 3.0,
+      complete: () => enableControls(viewer),
+      cancel: () => enableControls(viewer),
+    });
+  } else {
+    viewer.camera.setView(OPENING_VIEW);
+  }
 }
 
 // Cesium's flyTo disables camera input during a flight and restores it on
