@@ -174,9 +174,14 @@ export function initExplore(viewer, artifacts, discList, discs) {
     const cam = scene.camera;
     const camN2 = Cesium.Cartesian3.normalize(cam.positionWC, new Cesium.Cartesian3());
     const camMag = Cesium.Cartesian3.magnitude(cam.positionWC);
-    const thresh = discs.pxSize + 5;
-    let best = null;
-    let bestD2 = thresh * thresh;
+    const r2 = discs.pxSize * discs.pxSize; // cursor inside the drawn disc
+    const nearLimit = (discs.pxSize + 6) * (discs.pxSize + 6);
+    // Prefer the frontmost disc the cursor is actually over (what's visually
+    // on top); fall back to the nearest disc centre if none is directly hit.
+    let front = null;
+    let frontDist = Infinity;
+    let near = null;
+    let nearD2 = nearLimit;
     for (const d of discList) {
       const pos = discRestPosition(d);
       if (!pos || !onNearSide(pos, camN2, camMag)) continue;
@@ -189,12 +194,18 @@ export function initExplore(viewer, artifacts, discList, discs) {
       const dx = p.x - x;
       const dy = p.y - y;
       const d2 = dx * dx + dy * dy;
-      if (d2 < bestD2) {
-        bestD2 = d2;
-        best = d;
+      if (d2 <= r2) {
+        const cd = Cesium.Cartesian3.distance(cam.positionWC, pos);
+        if (cd < frontDist) {
+          frontDist = cd;
+          front = d;
+        }
+      } else if (d2 < nearD2) {
+        nearD2 = d2;
+        near = d;
       }
     }
-    return best;
+    return front || near;
   }
 
   const handler = viewer.screenSpaceEventHandler;

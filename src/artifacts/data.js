@@ -36,7 +36,7 @@ const PILE_TOP = 46;
 const PILE_FLOOR = 3;
 // Shift the heap off the dome centre toward the entrance/forecourt (south).
 const PILE_OFFSET_E = 0; // metres east
-const PILE_OFFSET_N = -42; // metres north (negative = south, toward entrance)
+const PILE_OFFSET_N = -18; // metres north (negative = south, toward entrance)
 
 // Deterministic PRNG (mulberry32) so the pile/jitter are stable across runs.
 function mulberry(seed) {
