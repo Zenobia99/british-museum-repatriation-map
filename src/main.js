@@ -1,7 +1,7 @@
 import './style.css';
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import { addMuseum, flyToHeroView, flyToEntrance, logCam } from './museum.js';
+import { addMuseum, flyToMuseum, logCam } from './museum.js';
 import { addBorders } from './borders.js';
 import { loadArtifacts, buildPositions } from './artifacts/data.js';
 import { addPhotoDiscs } from './artifacts/discs.js';
@@ -10,7 +10,7 @@ import { initExplore } from './explore.js';
 
 // Visible build stamp so it's obvious which version is actually running
 // (defeats stale dev-server / service-worker confusion).
-const BUILD = 'v8 — corner-label + pile-pick fix';
+const BUILD = 'v9 — compact pile + museum orbit cam';
 console.log(`%c[Return Them Home] build ${BUILD}`, 'color:#e8b24a;font-weight:bold');
 window.addEventListener('DOMContentLoaded', () => {
   const stamp = document.createElement('div');
@@ -108,22 +108,22 @@ async function init() {
   scene.msaaSamples = 4; // smoother building/border/disc geometry edges
   scene.globe.enableLighting = true;
 
-  // Camera controls: allow zooming in close to the building and far out, and
-  // don't let terrain-collision wedge the camera so it can always be moved.
+  // Camera controls: zoom from close-to-the-building out to deep space, with
+  // collision detection ON so the camera can't be driven under the terrain.
   const ctrl = scene.screenSpaceCameraController;
-  ctrl.minimumZoomDistance = 2.0;
+  ctrl.minimumZoomDistance = 30.0;
   ctrl.maximumZoomDistance = 4.0e7;
-  ctrl.enableCollisionDetection = false;
+  ctrl.enableCollisionDetection = true;
   scene.skyAtmosphere.show = true;
   scene.sun.show = true;
   scene.moon.show = true;
   scene.fog.enabled = true;
   viewer.cesiumWidget.creditContainer.style.display = 'none';
 
-  // Phase 1: seat the real British Museum at Bloomsbury and open on the hero
-  // view.
+  // Phase 1: seat the real British Museum at Bloomsbury and open on the
+  // comfortable oblique museum view (orbit/zoom controls available).
   await addMuseum(viewer);
-  flyToHeroView(viewer, /* animate */ false);
+  flyToMuseum(viewer, /* animate */ false);
 
   // Country borders (Natural Earth 110m), guarded.
   try {
@@ -164,9 +164,8 @@ async function init() {
 
   window.discs = discs;
   window.story = story;
-  // Console helpers for framing the entrance shot live.
+  // Console helper for capturing a camera pose live.
   window.logCam = () => logCam(viewer);
-  window.flyToEntrance = () => flyToEntrance(viewer);
 }
 
 init().catch((err) => {

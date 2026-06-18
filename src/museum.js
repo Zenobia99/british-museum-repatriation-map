@@ -85,6 +85,29 @@ export function flyToHeroView(viewer, animate = true) {
   }
 }
 
+// A comfortable oblique view that frames the museum from ~1.5 km up. Using
+// flyToBoundingSphere (rather than a hard-coded near-ground pose) keeps the
+// camera high enough that the normal orbit/zoom globe controls apply — so the
+// opening and closing feel the same as exploring the globe, and the camera
+// can't end up under the terrain.
+const MUSEUM_FRAME = { heading: 35, pitch: -34, range: 1900 };
+
+export function flyToMuseum(viewer, animate = true) {
+  const center = Cesium.Cartesian3.fromDegrees(MUSEUM.lon, MUSEUM.lat, 30);
+  const sphere = new Cesium.BoundingSphere(center, 220);
+  viewer.camera.cancelFlight();
+  viewer.camera.flyToBoundingSphere(sphere, {
+    offset: new Cesium.HeadingPitchRange(
+      Cesium.Math.toRadians(MUSEUM_FRAME.heading),
+      Cesium.Math.toRadians(MUSEUM_FRAME.pitch),
+      MUSEUM_FRAME.range
+    ),
+    duration: animate ? 3.0 : 0,
+    complete: () => enableControls(viewer),
+    cancel: () => enableControls(viewer),
+  });
+}
+
 // Cesium's flyTo disables camera input during a flight and restores it on
 // completion; overlapping flights can leave it stuck off. Always force input
 // back on when a flight ends so the final frame is controllable.

@@ -26,10 +26,11 @@ const HOME_ALT = 1200;
 const HOME_SCATTER_M = 32000;
 
 // Pile geometry around the museum, in local east-north-up metres. A compact
-// gaussian swarm hugging the building so artefacts read as leaving it.
-const PILE_RADIUS = 70; // metres
-const PILE_TOP = 120;
-const PILE_FLOOR = 8;
+// gaussian swarm hugging the building so artefacts read as leaving it —
+// tightened so it no longer spills well beyond the building footprint.
+const PILE_RADIUS = 42; // metres
+const PILE_TOP = 78;
+const PILE_FLOOR = 6;
 
 // Deterministic PRNG (mulberry32) so the pile/jitter are stable across runs.
 function mulberry(seed) {
