@@ -31,12 +31,12 @@ const HOME_SCATTER_M = 32000;
 // absolute ellipsoid heights, whereas the model is clamped to ground ~+20m in
 // Bloomsbury — without the lift the pile sinks into the building).
 const PILE_BASE_H = 14; // metres above the ellipsoid (approx London ground)
-const PILE_RADIUS = 30; // metres
-const PILE_TOP = 46;
-const PILE_FLOOR = 3;
+const PILE_RADIUS = 28.5; // metres
+const PILE_TOP = 14;
+const PILE_FLOOR = 1;
 // Shift the heap off the dome centre toward the entrance/forecourt (south).
 const PILE_OFFSET_E = 18; // metres east
-const PILE_OFFSET_N = -30; // metres north (negative = south, toward entrance)
+const PILE_OFFSET_N = -24; // metres north (negative = south, toward entrance)
 
 // Deterministic PRNG (mulberry32) so the pile/jitter are stable across runs.
 function mulberry(seed) {
