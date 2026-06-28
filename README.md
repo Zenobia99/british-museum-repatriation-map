@@ -1,40 +1,27 @@
-# Return Them Home — Lite
+# Return Them Home — 2D (edge / mobile)
 
-A lightweight **2D** version of the *Return Them Home* British Museum
-repatriation map, built for **phones, tablets, and low-power devices**.
+The lightweight **2D** companion to the full 3D *Return Them Home* experience,
+for **phones, tablets and low-power devices**. An interactive Leaflet map of
+British Museum objects with photos and per-object detail — no WebGL, no Cesium.
 
-No WebGL, no Cesium, no 3D tiles — just an HTML5 Canvas equirectangular world
-map. The 5,000 real British Museum objects are plotted at their origins; press
-**Return them home** to watch them stream out from Bloomsbury along arcs, or
-**Timeline Back** to bring them home in acquisition-year order with a year
-ticker. Tap any object for its detail card.
-
-This is a **separate, standalone project** from the full 3D experience
-(`return-them-home`) — deliberately decoupled so it can't affect it.
-
-## Stack
-
-- Plain HTML + CSS + a single ES-module `lite.js`. **No build step.**
-- Canvas 2D for the map and animation.
-- `topojson-client` loaded from a CDN (for the country borders).
-- Data: `data/artifacts.json` and `data/countries-110m.json` (bundled).
-- Object photos in the detail card load from the British Museum media CDN.
+Standalone, static, no build step. Separate from the 3D project by design.
 
 ## Run locally
-
-It's static — serve the folder with anything:
-
 ```bash
-python3 -m http.server 8000
-# open http://localhost:8000/
+python3 -m http.server 8000   # then open http://localhost:8000/
 ```
 
 ## Deploy (GitHub Pages)
+Push to your repo, then **Settings → Pages → Source: Deploy from a branch →
+`main` / `/ (root)`**. No build needed.
 
-No build needed. Push to your repo, then **Settings → Pages → Build and
-deployment → Source: Deploy from a branch → `main` / `/ (root)`**. Done.
+## Files
+- `index.html` — the map app (Leaflet from CDN).
+- `bm_final_artifacts.json` — the curated artefact list (204 objects).
+- `images/` — object photographs.
+
+The "Switch to 3D Globe Map" link points at the full 3D app
+(`../return-them-home/`).
 
 ## Licence
-
-Object photographs © The Trustees of the British Museum, CC BY-NC-SA 4.0
-unless noted otherwise.
+Object photographs © The Trustees of the British Museum, CC BY-NC-SA 4.0.
