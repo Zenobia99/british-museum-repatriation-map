@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b0d10" />
+  <title>Return Them Home — Lite</title>
+  <meta name="description"
+    content="A lightweight 2D map of 5,000 British Museum objects streaming home to their origins. Built for phones and low-power devices." />
+  <link rel="stylesheet" href="lite.css" />
+</head>
+<body>
+  <canvas id="map"></canvas>
+
+  <div id="ui">
+    <h1>Return Them Home</h1>
+    <p class="tag">5,000 British Museum objects, piled in Bloomsbury — sent home.</p>
+    <div class="controls">
+      <button id="btn-home" class="primary">Return them home</button>
+      <button id="btn-taken">Timeline Back</button>
+    </div>
+  </div>
+
+  <div id="loading">Loading…</div>
+
+  <div id="card" hidden>
+    <button id="card-close" aria-label="Close">×</button>
+    <div class="card-img"><img alt="" /></div>
+    <div class="card-body">
+      <h2 class="card-name"></h2>
+      <div class="card-origin"></div>
+      <dl class="card-meta"></dl>
+      <p class="card-desc"></p>
+      <a class="card-link" target="_blank" rel="noopener">View at the British Museum ↗</a>
+    </div>
+  </div>
+
+  <a id="full-link" href="../return-them-home/?full=1">Desktop 3D version ↗</a>
+
+  <div id="year"></div>
+
+  <script type="module" src="lite.js"></script>
+</body>
+</html>
