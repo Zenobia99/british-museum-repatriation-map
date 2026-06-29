@@ -27,14 +27,27 @@
   .ctl input[type="number"] { width: 64px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 6px 8px; font-size: 13px; }
   .ctl input[type="search"] { width: 150px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 7px 10px; font-size: 13px; }
   .switch-3d { font-size: 13px; font-weight: 600; text-decoration: none; color: #1a1205; background: linear-gradient(180deg,#e8b24a,#d2932a); padding: 8px 14px; border-radius: 999px; white-space: nowrap; }
+  .hidden { display: none !important; }
 
   #loading { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; background: #1b140c; color: #d8c9ad; font-size: 15px; }
 
-  .disc-img {
-    width: 100%; height: 100%; border-radius: 50%;
-    border: 2px solid #e8b24a; box-shadow: 0 1px 4px rgba(0,0,0,0.6);
-    background-color: #2a2118; background-repeat: no-repeat;
+  /* White fade overlay for the reveal */
+  #flash { position: fixed; inset: 0; z-index: 1500; background: #fff; opacity: 0; pointer-events: none; transition: opacity 0.75s ease; }
+  #flash.on { opacity: 1; }
+
+  /* Museum "start here" marker */
+  .museum-pin {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 30px;
+    background: radial-gradient(circle at 50% 35%, #f6d28a, #d2932a);
+    border: 3px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    cursor: pointer; animation: pulse 1.8s ease-in-out infinite;
   }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,178,74,0.6);} 50% { box-shadow: 0 0 0 14px rgba(232,178,74,0);} }
+  .leaflet-tooltip.start-tip { background:#1b140c; color:#f5efe2; border:1px solid #e8b24a; font-weight:700; font-size:13px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.5); }
+  .leaflet-tooltip.start-tip::before { border-top-color:#e8b24a; }
+
+  .disc-img { width: 100%; height: 100%; border-radius: 50%; border: 2px solid #e8b24a; box-shadow: 0 1px 4px rgba(0,0,0,0.6); background-color: #2a2118; background-repeat: no-repeat; }
   .leaflet-marker-icon .disc-img:hover { border-color: #fff; }
 
   .leaflet-popup-content { margin: 0; width: 250px !important; }
@@ -51,62 +64,57 @@
 </head>
 <body>
   <div id="map"></div>
+  <div id="flash"></div>
   <div class="bar">
     <div>
       <div class="title">Return Them Home</div>
-      <div class="count"><span id="count">…</span> shown</div>
+      <div class="count" id="subtitle">Tap the British Museum to begin →</div>
     </div>
     <div class="spacer"></div>
-    <div class="ctl">
+    <div class="ctl hidden" id="ctl-years">
       <label>Years</label>
       <input type="number" id="yearFrom" value="-4000" step="100" inputmode="numeric" />
       <span style="color:#8a7d63">–</span>
       <input type="number" id="yearTo" value="2025" step="100" inputmode="numeric" />
     </div>
-    <div class="ctl"><input type="search" id="q" placeholder="Search name / country" /></div>
+    <div class="ctl hidden" id="ctl-q"><input type="search" id="q" placeholder="Search name / country" /></div>
     <a class="switch-3d" href="../return-them-home/?full=1">🌐 3D Globe</a>
   </div>
   <div id="loading">Loading the collection…</div>
 
   <script>
-    const ATLAS_N = 32;          // tiles per atlas row
-    const MAX_MARKERS = 450;     // cap so mobile is never overwhelmed
+    const ATLAS_N = 32;
+    const MAX_MARKERS = 450;
+    const LONDON = [51.5194, -0.1269];
     let ALL = [];
+    let started = false;
 
     const map = L.map('map', { zoomControl: false, attributionControl: false, worldCopyJump: true })
-      .setView([25, 12], 3);
+      .setView([51.0, 4.0], 5); // open framing UK + Europe, museum pin at London
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
 
+    const flash = document.getElementById('flash');
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
     const dateText = (a) => a.date_text || (a.year == null ? 'Unknown' : (a.year < 0 ? Math.abs(a.year) + ' BC' : a.year + ' AD'));
 
-    // Atlas tile as a CSS sprite (scales to any box).
     function thumbBg(a) {
       if (!a.atlas) return '';
       const x = a.atlas.u * ATLAS_N / (ATLAS_N - 1) * 100;
       const y = a.atlas.v * ATLAS_N / (ATLAS_N - 1) * 100;
-      return `background-image:url(atlas/atlas_${a.atlas.atlas_index}.jpg);` +
-             `background-size:${ATLAS_N * 100}% ${ATLAS_N * 100}%;background-position:${x}% ${y}%;`;
+      return `background-image:url(atlas/atlas_${a.atlas.atlas_index}.jpg);background-size:${ATLAS_N * 100}% ${ATLAS_N * 100}%;background-position:${x}% ${y}%;`;
     }
     function discIcon(a) {
-      return L.divIcon({
-        className: '',
-        html: `<div class="disc-img" style="${thumbBg(a)}"></div>`,
-        iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -14],
-      });
+      return L.divIcon({ className: '', html: `<div class="disc-img" style="${thumbBg(a)}"></div>`, iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -14] });
     }
     function popupHtml(a) {
       const url = a.image_source_url || a.image_url || '';
-      return `<div class="pc">
-        <div class="pc-img" style="${thumbBg(a)};background-size:cover;"></div>
-        <div class="pc-body">
-          <div class="pc-name">${esc(a.name)}</div>
-          <div class="pc-origin">${esc(a.origin)}</div>
-          <div class="pc-meta"><b>Date:</b> ${esc(dateText(a))}${a.material ? `<br><b>Material:</b> ${esc(a.material)}` : ''}${a.museum_number ? `<br><b>Museum no.:</b> ${esc(a.museum_number)}` : ''}</div>
-          ${a.description ? `<div class="pc-desc">${esc(a.description)}</div>` : ''}
-          ${url ? `<a class="pc-link" href="${esc(url)}" target="_blank" rel="noopener">View at the British Museum ↗</a>` : ''}
-        </div></div>`;
+      return `<div class="pc"><div class="pc-img" style="${thumbBg(a)};background-size:cover;"></div><div class="pc-body">
+        <div class="pc-name">${esc(a.name)}</div><div class="pc-origin">${esc(a.origin)}</div>
+        <div class="pc-meta"><b>Date:</b> ${esc(dateText(a))}${a.material ? `<br><b>Material:</b> ${esc(a.material)}` : ''}${a.museum_number ? `<br><b>Museum no.:</b> ${esc(a.museum_number)}` : ''}</div>
+        ${a.description ? `<div class="pc-desc">${esc(a.description)}</div>` : ''}
+        ${url ? `<a class="pc-link" href="${esc(url)}" target="_blank" rel="noopener">View at the British Museum ↗</a>` : ''}
+      </div></div>`;
     }
 
     const layer = L.layerGroup().addTo(map);
@@ -132,7 +140,29 @@
         layer.addLayer(m);
       }
       document.getElementById('count').textContent =
-        total > f.length ? `${f.length.toLocaleString()} of ${total.toLocaleString()} in range` : f.length.toLocaleString();
+        total > f.length ? `${f.length.toLocaleString()} of ${total.toLocaleString()} in range` : `${f.length.toLocaleString()} shown`;
+    }
+
+    // Intro: museum "start here" marker -> fade to white -> reveal discs.
+    const museumIcon = L.divIcon({ className: '', html: '<div class="museum-pin">🏛️</div>', iconSize: [56, 56], iconAnchor: [28, 28] });
+    const startMarker = L.marker(LONDON, { icon: museumIcon, zIndexOffset: 1000 })
+      .bindTooltip('Start here — the British Museum', { permanent: true, direction: 'top', offset: [0, -26], className: 'start-tip' })
+      .addTo(map);
+    startMarker.on('click', begin);
+
+    function begin() {
+      if (started) return;
+      started = true;
+      flash.classList.add('on'); // fade to white (0.75s)
+      setTimeout(() => {
+        map.removeLayer(startMarker);
+        map.setView([25, 12], 3); // pull out to the world
+        document.getElementById('ctl-years').classList.remove('hidden');
+        document.getElementById('ctl-q').classList.remove('hidden');
+        document.getElementById('subtitle').id = 'count';
+        render();                  // discs now in their returned-home places
+        requestAnimationFrame(() => flash.classList.remove('on')); // fade back
+      }, 800);
     }
 
     let t;
@@ -144,17 +174,14 @@
     });
 
     fetch('artifacts.json').then((r) => r.json()).then((raw) => {
-      ALL = raw
-        .map((a) => ({
-          name: a.name || 'Object', origin: a.origin || a.origin_country || '',
-          lat: a.lat, lng: a.lng, year: typeof a.year === 'number' ? a.year : null,
-          material: a.material || '', date_text: a.date_text || '', description: a.description || '',
-          image_url: a.image_url || '', image_source_url: a.image_source_url || '',
-          museum_number: a.museum_number || '', atlas: a.atlas,
-        }))
-        .filter((a) => typeof a.lat === 'number' && typeof a.lng === 'number' && a.atlas);
+      ALL = raw.map((a) => ({
+        name: a.name || 'Object', origin: a.origin || a.origin_country || '',
+        lat: a.lat, lng: a.lng, year: typeof a.year === 'number' ? a.year : null,
+        material: a.material || '', date_text: a.date_text || '', description: a.description || '',
+        image_url: a.image_url || '', image_source_url: a.image_source_url || '',
+        museum_number: a.museum_number || '', atlas: a.atlas,
+      })).filter((a) => typeof a.lat === 'number' && typeof a.lng === 'number' && a.atlas);
       document.getElementById('loading').remove();
-      render();
     }).catch((e) => { document.getElementById('loading').textContent = 'Failed to load: ' + e.message; });
   </script>
 </body>
