@@ -34,6 +34,7 @@
   /* White fade overlay for the reveal */
   #flash { position: fixed; inset: 0; z-index: 1500; background: #fff; opacity: 0; pointer-events: none; transition: opacity 0.75s ease; }
   #flash.on { opacity: 1; }
+  #fx { position: fixed; inset: 0; z-index: 1520; pointer-events: none; }
 
   /* Museum "start here" marker */
   .museum-pin {
@@ -65,6 +66,7 @@
 <body>
   <div id="map"></div>
   <div id="flash"></div>
+  <canvas id="fx"></canvas>
   <div class="bar">
     <div>
       <div class="title">Return Them Home</div>
@@ -155,14 +157,87 @@
       started = true;
       flash.classList.add('on'); // fade to white (0.75s)
       setTimeout(() => {
+        // Prepare the revealed scene behind the white.
         map.removeLayer(startMarker);
-        map.setView([25, 12], 3); // pull out to the world
+        map.setView([25, 12], 3);
         document.getElementById('ctl-years').classList.remove('hidden');
         document.getElementById('ctl-q').classList.remove('hidden');
         document.getElementById('subtitle').id = 'count';
-        render();                  // discs now in their returned-home places
-        requestAnimationFrame(() => flash.classList.remove('on')); // fade back
-      }, 800);
+        render();
+        // Arching firework sprites over the white, then dissolve to reveal.
+        fireworks(1900, () => flash.classList.remove('on'));
+      }, 700);
+    }
+
+    // Canvas fireworks: warm rockets arc up from the base and burst into
+    // glittering sprites — tuned to read on the white flash.
+    const fxCanvas = document.getElementById('fx');
+    const fxCtx = fxCanvas.getContext('2d');
+    const WARM = ['#e8b24a', '#f6d28a', '#d2932a', '#c0541f', '#b03a2e', '#f0a020'];
+    function fireworks(duration, onFade) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const W = window.innerWidth, H = window.innerHeight;
+      fxCanvas.width = W * dpr; fxCanvas.height = H * dpr;
+      fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const rockets = [], sparks = [];
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      function launch() {
+        rockets.push({
+          x: rnd(W * 0.2, W * 0.8), y: H + 8,
+          vx: rnd(-2.4, 2.4), vy: rnd(-15, -11),
+          color: WARM[(Math.random() * WARM.length) | 0], trail: [],
+        });
+      }
+      function burst(x, y, color) {
+        const n = 46;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + rnd(-0.1, 0.1);
+          const sp = rnd(1.5, 5.5);
+          sparks.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+            life: 1, decay: rnd(0.012, 0.026), color });
+        }
+      }
+      const t0 = performance.now();
+      let lastLaunch = 0;
+      let faded = false;
+      function frame(now) {
+        const el = now - t0;
+        fxCtx.clearRect(0, 0, W, H);
+        if (el < 1200 && now - lastLaunch > 230) { launch(); lastLaunch = now; }
+
+        for (let i = rockets.length - 1; i >= 0; i--) {
+          const r = rockets[i];
+          r.vy += 0.22; r.x += r.vx; r.y += r.vy;
+          r.trail.push([r.x, r.y]); if (r.trail.length > 8) r.trail.shift();
+          fxCtx.strokeStyle = r.color; fxCtx.lineWidth = 2;
+          fxCtx.globalAlpha = 0.8; fxCtx.beginPath();
+          r.trail.forEach((p, k) => k ? fxCtx.lineTo(p[0], p[1]) : fxCtx.moveTo(p[0], p[1]));
+          fxCtx.stroke();
+          if (r.vy >= -1) { burst(r.x, r.y, r.color); rockets.splice(i, 1); }
+        }
+
+        fxCtx.globalAlpha = 1;
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const s = sparks[i];
+          s.vy += 0.06; s.vx *= 0.985; s.vy *= 0.985;
+          s.x += s.vx; s.y += s.vy; s.life -= s.decay;
+          if (s.life <= 0) { sparks.splice(i, 1); continue; }
+          fxCtx.globalAlpha = Math.max(s.life, 0);
+          fxCtx.fillStyle = s.color;
+          fxCtx.shadowColor = s.color; fxCtx.shadowBlur = 8;
+          fxCtx.beginPath(); fxCtx.arc(s.x, s.y, 2.4, 0, Math.PI * 2); fxCtx.fill();
+        }
+        fxCtx.shadowBlur = 0; fxCtx.globalAlpha = 1;
+
+        if (!faded && el > duration * 0.55) { faded = true; if (onFade) onFade(); }
+        if (el < duration + 1200 && (rockets.length || sparks.length || el < 1300)) {
+          requestAnimationFrame(frame);
+        } else {
+          fxCtx.clearRect(0, 0, W, H);
+        }
+      }
+      requestAnimationFrame(frame);
     }
 
     let t;
