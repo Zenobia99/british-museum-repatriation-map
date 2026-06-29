@@ -1,1008 +1,161 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>If All Artifacts Returned Home</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#1b140c" />
+<title>Return Them Home — Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: #f5f0e6;
-    color: #2c2416;
-    overflow: hidden;
-    height: 100vh;
-  }
-  
-  .app {
-    display: flex;
-    height: 100vh;
-  }
-  
-  /* Sidebar */
-  .sidebar {
-    width: 380px;
-    background: #eae3d1;
-    border-right: 1px solid #d4c9b0;
-    display: flex;
-    flex-direction: column;
-    z-index: 1000;
-    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
-  }
-  
-  .sidebar-header {
-    padding: 24px;
-    border-bottom: 1px solid #d4c9b0;
-    background: #f0e8d5;
-  }
-  
-  .sidebar-header h1 {
-    font-size: 18px;
-    font-weight: 600;
-    color: #1a1510;
-    margin-bottom: 8px;
-    letter-spacing: -0.3px;
-  }
-  
-  .sidebar-header p {
-    font-size: 12px;
-    color: #6b5d4a;
-    line-height: 1.4;
-  }
-  
-  .stats {
-    display: flex;
-    gap: 12px;
-    margin-top: 12px;
-    font-size: 11px;
-    color: #5a4d3a;
-  }
-  
-  .stat {
-    background: #fff;
-    padding: 6px 10px;
-    border-radius: 4px;
-    border: 1px solid #d4c9b0;
-  }
-  
-  .stat strong {
-    color: #1a1510;
-    font-size: 13px;
-  }
-  
-  .search-bar {
-    padding: 12px 16px;
-    border-bottom: 1px solid #d4c9b0;
-  }
-  
-  .search-bar input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #c4b8a0;
-    border-radius: 6px;
-    font-size: 13px;
-    background: #fff;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  
-  .search-bar input:focus {
-    border-color: #8b7355;
-  }
-  
-  .selection-toolbar {
-    padding: 10px 16px;
-    border-bottom: 1px solid #d4c9b0;
-    background: #f0e8d5;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  
-  .selection-toolbar button {
-    background: #fff;
-    border: 1px solid #c4b8a0;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    cursor: pointer;
-    color: #2c2416;
-  }
-  
-  .selection-toolbar button:hover {
-    background: #f5f0e6;
-  }
-  
-  .selection-toolbar button.primary {
-    background: #2c2416;
-    color: #f5f0e6;
-    border-color: #2c2416;
-  }
-  
-  .selection-toolbar button.primary:hover {
-    background: #4a3c28;
-  }
-  
-  .selection-count {
-    font-size: 11px;
-    color: #5a4d3a;
-    margin-left: auto;
-  }
-  
-  .filters {
-    padding: 12px 16px;
-    border-bottom: 1px solid #d4c9b0;
-  }
-  
-  .filter-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11px;
-    color: #5a4d3a;
-    margin-bottom: 6px;
-  }
-  
-  .filter-row input {
-    width: 80px;
-    padding: 4px 8px;
-    border: 1px solid #c4b8a0;
-    border-radius: 4px;
-    font-size: 11px;
-    background: #fff;
-  }
-  
-  .artifact-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 0;
-  }
-  
-  /* macOS Finder-style selection */
-  .artifact-item {
-    display: flex;
-    gap: 10px;
-    padding: 10px 16px;
-    cursor: pointer;
-    border-bottom: 1px solid #e0d7c3;
-    transition: background 0.15s;
-    align-items: center;
-    user-select: none;
-  }
-  
-  .artifact-item:hover {
-    background: #f0e8d5;
-  }
-  
-  .artifact-item.selected {
-    background: #c9d8f5;
-    border-left: 3px solid #007aff;
-  }
-  
-  .artifact-item.in-transit {
-    opacity: 0.5;
-  }
-  
-  .artifact-item.returned {
-    background: #e8f5e9;
-  }
-  
-  .artifact-item.returned.selected {
-    background: #c9d8f5;
-  }
-  
-  .artifact-checkbox {
-    width: 16px;
-    height: 16px;
-    border: 1.5px solid #999;
-    border-radius: 3px;
-    background: #fff;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    color: #fff;
-    transition: all 0.1s;
-  }
-  
-  .artifact-item.selected .artifact-checkbox {
-    background: #007aff;
-    border-color: #007aff;
-  }
-  
-  .artifact-thumb {
-    width: 44px;
-    height: 44px;
-    border-radius: 4px;
-    overflow: hidden;
-    flex-shrink: 0;
-    background: #c4b8a0;
-  }
-    
-  .artifact-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  
-  .artifact-info {
-    flex: 1;
-    min-width: 0;
-  }
-  
-  .artifact-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: #1a1510;
-    margin-bottom: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  .artifact-origin {
-    font-size: 11px;
-    color: #6b5d4a;
-    margin-bottom: 1px;
-  }
-  
-  .artifact-date {
-    font-size: 10px;
-    color: #8b7d68;
-  }
-  
-  /* Map */
-  .map-container {
-    flex: 1;
-    position: relative;
-  }
-  
-  #map {
-    width: 100%;
-    height: 100%;
-    background: #e8e0d0;
-  }
-  
-  /* Custom Leaflet styles */
-  .artifact-marker {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #8b4513;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    cursor: pointer;
-    transition: transform 0.2s, background 0.2s;
-    font-size: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .artifact-marker:hover {
-    transform: scale(1.2);
-    background: #a0522d;
-  }
-  
-  .artifact-marker.london {
-    background: #d32f2f;
-    border-color: #fff;
-  }
-  .artifact-marker.london.selected {
-    background: #d32f2f;
-    border-color: #007aff;
-    border-width: 4px;
-  }
-  
-  .artifact-marker.home {
-    background: #2e7d32;
-    border-color: #fff;
-  }
-  .artifact-marker.home.selected {
-    background: #2e7d32;
-    border-color: #007aff;
-    border-width: 4px;
-  }
-  
-  .artifact-marker.between {
-    background: #f57c00;
-    border-color: #fff;
-  }
-  
-  /* Controls */
-  .controls {
-    position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 999;
-    background: rgba(255,255,255,0.95);
-    padding: 14px 24px;
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    backdrop-filter: blur(8px);
-    border: 1px solid #d4c9b0;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  
-  .controls button {
-    background: #2c2416;
-    color: #f5f0e6;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  
-  .controls button:hover:not(:disabled) {
-    background: #4a3c28;
-  }
-  
-  .controls button:disabled {
-    background: #b8a990;
-    cursor: not-allowed;
-  }
-  
-  .controls button.secondary {
-    background: #fff;
-    color: #2c2416;
-    border: 1px solid #d4c9b0;
-  }
-  
-  .controls button.secondary:hover:not(:disabled) {
-    background: #f5f0e6;
-  }
-  
-  .controls button.accent {
-    background: #007aff;
-    color: #fff;
-    border-color: #007aff;
-  }
-  
-  .controls button.accent:hover:not(:disabled) {
-    background: #005ecb;
-  }
-  
-  .legend {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    z-index: 999;
-    background: rgba(255,255,255,0.9);
-    padding: 12px;
-    border-radius: 6px;
-    font-size: 11px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border: 1px solid #d4c9b0;
-  }
-  
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-  }
-  
-  .legend-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-  }
-  
-  .dot-london { background: #d32f2f; }
-  .dot-home { background: #2e7d32; }
-  .dot-between { background: #f57c00; }
-  .dot-selected { background: #007aff; }
-  
-  .instructions {
-    position: absolute;
-    bottom: 90px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 999;
-    background: rgba(0,0,0,0.7);
-    color: #fff;
-    padding: 8px 14px;
-    border-radius: 6px;
-    font-size: 11px;
-    pointer-events: none;
-    opacity: 0.9;
-  }
-  
-  /* Popup */
-  .artifact-popup {
-    font-family: inherit;
-    max-width: 280px;
-  }
-  
-  .popup-title {
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: #1a1510;
-  }
-  
-  .popup-meta {
-    font-size: 12px;
-    color: #6b5d4a;
-    line-height: 1.5;
-  }
-  
-  .popup-image {
-    width: 100%;
-    height: 100px;
-    background: #e0d7c3;
-    border-radius: 4px;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-  }
-  
-  .switch-3d-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #8b7355;
-    color: #fff;
-    text-decoration: none;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: bold;
-    margin-top: 12px;
-    transition: background-color 0.2s, transform 0.1s;
-    border: none;
-    cursor: pointer;
-  }
-  .switch-3d-btn:hover {
-    background: #755f45;
-  }
-  .switch-3d-btn:active {
-    transform: scale(0.98);
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1b140c; color: #f5efe2; overflow: hidden; }
+  #map { position: fixed; inset: 0; background: #cfe3ef; }
+
+  .bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+    display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px 10px;
+    background: linear-gradient(180deg, rgba(20,15,8,0.94), rgba(20,15,8,0.0));
+  }
+  .bar .title { font-size: 17px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,0.8); }
+  .bar .count { font-size: 12px; color: #d8c9ad; }
+  .bar .spacer { flex: 1 1 12px; }
+  .ctl { display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.35); padding: 7px 10px; border-radius: 999px; backdrop-filter: blur(6px); }
+  .ctl label { font-size: 11px; color: #d8c9ad; }
+  .ctl input[type="number"] { width: 64px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+  .ctl input[type="search"] { width: 150px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+  .switch-3d { font-size: 13px; font-weight: 600; text-decoration: none; color: #1a1205; background: linear-gradient(180deg,#e8b24a,#d2932a); padding: 8px 14px; border-radius: 999px; white-space: nowrap; }
+
+  #loading { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; background: #1b140c; color: #d8c9ad; font-size: 15px; }
+
+  .disc-img {
+    width: 100%; height: 100%; border-radius: 50%;
+    border: 2px solid #e8b24a; box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    background-color: #2a2118; background-repeat: no-repeat;
+  }
+  .leaflet-marker-icon .disc-img:hover { border-color: #fff; }
+
+  .leaflet-popup-content { margin: 0; width: 250px !important; }
+  .pc { border-radius: 12px; overflow: hidden; }
+  .pc-img { width: 100%; height: 190px; background-color:#2a2118; background-repeat:no-repeat; }
+  .pc-body { padding: 12px 14px 14px; color:#241c10; }
+  .pc-name { font-size: 16px; font-weight: 700; line-height: 1.25; }
+  .pc-origin { color: #b07d1a; font-size: 13px; font-weight: 600; margin-top: 2px; }
+  .pc-meta { margin: 8px 0; font-size: 13px; color:#4a4030; line-height: 1.5; }
+  .pc-meta b { color:#6a5c40; font-weight: 600; }
+  .pc-desc { font-size: 12.5px; line-height: 1.45; color:#5a513f; max-height: 6.5em; overflow:auto; }
+  .pc-link { display:inline-block; margin-top:10px; font-size:13px; font-weight:600; color:#b07d1a; text-decoration:none; }
 </style>
 </head>
 <body>
-<div id="version-banner" style="position:sticky;top:0;z-index:50;background:#fffbe6;color:#5c4b1f;font:600 13px/1.4 system-ui;padding:6px 12px;border-bottom:1px solid #fde58a;text-align:center">Repatriation Map · BM dataset loaded · 204 artifacts · v2026-06-02</div>
-
-<div class="app">
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <h1>🏛️ If All Artifacts Returned Home</h1>
-      <p>An interactive map tracing the origins of British Museum objects taken from 99 countries.</p>
-      <div class="stats">
-        <div class="stat"><strong id="totalCount">0</strong> in list</div>
-        <div class="stat"><strong id="selectedCount">0</strong> selected</div>
-        <div class="stat"><strong id="returnedCount">0</strong> returned</div>
-      </div>
-      <a href="../return-them-home/" class="switch-3d-btn">
-        🌐 Switch to 3D Globe Map
-      </a>
+  <div id="map"></div>
+  <div class="bar">
+    <div>
+      <div class="title">Return Them Home</div>
+      <div class="count"><span id="count">…</span> shown</div>
     </div>
-    
-    <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="Search artifacts, countries...">
+    <div class="spacer"></div>
+    <div class="ctl">
+      <label>Years</label>
+      <input type="number" id="yearFrom" value="-4000" step="100" inputmode="numeric" />
+      <span style="color:#8a7d63">–</span>
+      <input type="number" id="yearTo" value="2025" step="100" inputmode="numeric" />
     </div>
-    
-    <div class="selection-toolbar">
-      <button onclick="selectAllVisible()">Select All</button>
-      <button onclick="clearSelection()">Clear</button>
-      <span class="selection-count" id="selectionHint">Click artifacts to select</span>
-    </div>
-    
-    <div class="filters">
-      <div class="filter-row">
-        <span>Date Range</span>
-        <span>
-          <input type="number" id="yearFrom" value="-4000" step="100"> —
-          <input type="number" id="yearTo" value="1900" step="100">
-        </span>
-      </div>
-    </div>
-    
-    <div class="artifact-list" id="artifactList"></div>
+    <div class="ctl"><input type="search" id="q" placeholder="Search name / country" /></div>
+    <a class="switch-3d" href="../return-them-home/?full=1">🌐 3D Globe</a>
   </div>
-  
-  <div class="map-container">
-    <div id="map"></div>
-    
-    <div class="legend">
-      <div class="legend-item"><div class="legend-dot dot-london"></div> In British Museum</div>
-      <div class="legend-item"><div class="legend-dot dot-home"></div> Returned home</div>
-      <div class="legend-item"><div class="legend-dot dot-selected"></div> Selected (Cmd-click)</div>
-    </div>
-    
-    <div class="instructions" id="instructions">Click to select · Cmd/Ctrl+Click to multi-select · Shift+Click for range</div>
-    
-    <div class="controls">
-      <button id="sendHomeBtn" class="accent">🏠 Send Selected Home</button>
-      <button id="sendAllBtn">↗ Send ALL Home</button>
-      <button id="resetBtn" class="secondary">↩ Reset to Museum</button>
-    </div>
-  </div>
-</div>
+  <div id="loading">Loading the collection…</div>
 
-<script>
-let ALL = [];
-let ARTIFACTS = [];
-const LONDON = { lat: 51.5, lng: -0.1 };
-let allIds = ARTIFACTS.map(a => a.id);
+  <script>
+    const ATLAS_N = 32;          // tiles per atlas row
+    const MAX_MARKERS = 450;     // cap so mobile is never overwhelmed
+    let ALL = [];
 
-// State
-let markers = {};
-let map;
-let selectedIds = new Set();
-let lastClickedIndex = null;
-let returnedIds = new Set();
-let ARTIFACT_IMAGES = {};
-let ARTIFACT_IMAGES_LOADED = false;
+    const map = L.map('map', { zoomControl: false, attributionControl: false, worldCopyJump: true })
+      .setView([25, 12], 3);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
 
-async function loadArtifactImages() {
-  if (ARTIFACT_IMAGES_LOADED) return;
-  try {
-    const resp = await fetch('./bm_final_artifacts.json');
-    if (resp.ok) {
-      const data = await resp.json();
-      data.forEach(entry => {
-        if (entry.image_url) {
-          ARTIFACT_IMAGES[entry.bm_id] = entry.image_url;
-        }
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+    const dateText = (a) => a.date_text || (a.year == null ? 'Unknown' : (a.year < 0 ? Math.abs(a.year) + ' BC' : a.year + ' AD'));
+
+    // Atlas tile as a CSS sprite (scales to any box).
+    function thumbBg(a) {
+      if (!a.atlas) return '';
+      const x = a.atlas.u * ATLAS_N / (ATLAS_N - 1) * 100;
+      const y = a.atlas.v * ATLAS_N / (ATLAS_N - 1) * 100;
+      return `background-image:url(atlas/atlas_${a.atlas.atlas_index}.jpg);` +
+             `background-size:${ATLAS_N * 100}% ${ATLAS_N * 100}%;background-position:${x}% ${y}%;`;
+    }
+    function discIcon(a) {
+      return L.divIcon({
+        className: '',
+        html: `<div class="disc-img" style="${thumbBg(a)}"></div>`,
+        iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -14],
       });
-      ARTIFACT_IMAGES_LOADED = true;
     }
-  } catch (e) { console.warn('Image index unavailable', e); }
-}
-
-
-// Initialize map
-map = L.map('map', {
-  center: [20, 20],
-  zoom: 2,
-  minZoom: 2,
-  zoomControl: false,
-  attributionControl: false
-});
-
-// English-only label basemap
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19
-}).addTo(map);
-
-L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-// Custom icon
-function createIcon(type, isSelected = false) {
-  let cls = `artifact-marker ${type}`;
-  if (isSelected) cls += ' selected';
-  return L.divIcon({
-    className: '',
-    html: `<div class="${cls}">${type === 'london' ? '🏛️' : type === 'home' ? '🏠' : '📍'}</div>`,
-    iconSize: [type === 'london' && isSelected ? 26 : 22, type === 'london' && isSelected ? 26 : 22],
-    iconAnchor: [type === 'london' && isSelected ? 13 : 11, type === 'london' && isSelected ? 13 : 11]
-  });
-}
-
-// Add markers
-function addMarkers() {
-  ARTIFACTS.forEach(artifact => {
-    const isReturned = returnedIds.has(artifact.id);
-    const isSelected = selectedIds.has(artifact.id);
-    const markerType = isReturned ? 'home' : 'london';
-    const marker = L.marker(isReturned ? [artifact.lat, artifact.lng] : [LONDON.lat, LONDON.lng], { 
-      icon: createIcon(markerType, isSelected) 
-    }).addTo(map);
-    
-    marker.bindPopup(`
-      <div class="artifact-popup">
-        <div class="popup-image">
-          <div style="width:100%;height:100%;${thumbBg(artifact)}"></div>
-        </div>
-        <div class="popup-title">${artifact.name}</div>
-        <div class="popup-meta">
-        <strong>Origin:</strong> ${artifact.origin}<br>
-        <strong>Date:</strong> ${artifact.date_text || (artifact.year !== null ? (artifact.year < 0 ? Math.abs(artifact.year) + ' BC' : artifact.year + ' AD') : 'Unknown')}<br>
-        <strong>Material:</strong> ${artifact.material}
-        ${(artifact.state || artifact.description || '') ? `<br><strong>State:</strong> ${artifact.state || artifact.description}` : ''}
-        ${isSelected ? '<br><strong style="color:#007aff">Selected</strong>' : ''}
-        ${isReturned ? '<br><strong style="color:#2e7d32">Returned home</strong>' : ''}
-        </div>
-      </div>
-    `);
-    
-    markers[artifact.id] = marker;
-  });
-}
-
-// Update list item appearance
-function updateItemClass(itemEl, artifact) {
-  const isSelected = selectedIds.has(artifact.id);
-  const isReturned = returnedIds.has(artifact.id);
-  itemEl.classList.toggle('selected', isSelected);
-  itemEl.classList.toggle('returned', isReturned);
-  itemEl.classList.toggle('in-transit', isInTransit(artifact.id));
-}
-
-function isInTransit(id) {
-  // Check if marker is currently animating (between London and home)
-  const m = markers[id];
-  if (!m) return false;
-  const ll = m.getLatLng();
-  const returned = returnedIds.has(id);
-  if (!returned) {
-    const distToLondon = Math.sqrt((ll.lat - LONDON.lat)**2 + (ll.lng - LONDON.lng)**2);
-    const art = ARTIFACTS.find(a => a.id === id);
-    const distToHome = art ? Math.sqrt((ll.lat - art.lat)**2 + (ll.lng - art.lng)**2) : 999;
-    return distToLondon > 0.1 && distToHome > 0.1;
-  }
-  return false;
-}
-
-// Selection logic (macOS Finder style)
-function toggleSelect(id, index) {
-  const isCmd = event.metaKey || event.ctrlKey;
-  const isShift = event.shiftKey;
-  
-  if (isShift && lastClickedIndex !== null) {
-    // Range select
-    const start = Math.min(lastClickedIndex, index);
-    const end = Math.max(lastClickedIndex, index);
-    for (let i = start; i <= end; i++) {
-      selectedIds.add(ARTIFACTS[i].id);
+    function popupHtml(a) {
+      const url = a.image_source_url || a.image_url || '';
+      return `<div class="pc">
+        <div class="pc-img" style="${thumbBg(a)};background-size:cover;"></div>
+        <div class="pc-body">
+          <div class="pc-name">${esc(a.name)}</div>
+          <div class="pc-origin">${esc(a.origin)}</div>
+          <div class="pc-meta"><b>Date:</b> ${esc(dateText(a))}${a.material ? `<br><b>Material:</b> ${esc(a.material)}` : ''}${a.museum_number ? `<br><b>Museum no.:</b> ${esc(a.museum_number)}` : ''}</div>
+          ${a.description ? `<div class="pc-desc">${esc(a.description)}</div>` : ''}
+          ${url ? `<a class="pc-link" href="${esc(url)}" target="_blank" rel="noopener">View at the British Museum ↗</a>` : ''}
+        </div></div>`;
     }
-  } else if (isCmd) {
-    // Toggle single
-    if (selectedIds.has(id)) {
-      selectedIds.delete(id);
-    } else {
-      selectedIds.add(id);
-    }
-  } else {
-    // Single select (clear others)
-    if (selectedIds.size === 1 && selectedIds.has(id)) {
-      // Clicking same item again — deselect all
-      selectedIds.clear();
-    } else {
-      selectedIds.clear();
-      selectedIds.add(id);
-    }
-  }
-  
-  lastClickedIndex = index;
-  refreshSelection();
-}
 
-function selectAllVisible() {
-  const visibleIds = getVisibleArtifactIds();
-  visibleIds.forEach(a => selectedIds.add(a.id));
-  refreshSelection();
-}
-
-function clearSelection() {
-  selectedIds.clear();
-  lastClickedIndex = null;
-  refreshSelection();
-}
-
-function getVisibleArtifactIds() {
-  const filterText = document.getElementById('searchInput').value.toLowerCase();
-  const yearFrom = parseInt(document.getElementById('yearFrom').value) || -4000;
-  const yearTo = parseInt(document.getElementById('yearTo').value) || 1900;
-  
-  return ARTIFACTS.filter(a => {
-    const matchesText = !filterText || 
-      a.name.toLowerCase().includes(filterText) ||
-      a.origin.toLowerCase().includes(filterText);
-    const matchesYear = a.year >= yearFrom && a.year <= yearTo;
-    return matchesText && matchesYear;
-  });
-}
-
-function refreshSelection() {
-  // Update list UI
-  document.querySelectorAll('.artifact-item').forEach(el => {
-    const id = el.dataset.id;
-    const art = ARTIFACTS.find(a => a.id === id);
-    if (art) updateItemClass(el, art);
-  });
-  
-  // Update markers — show selected marker style
-  allIds.forEach(id => {
-    const isSelected = selectedIds.has(id);
-    const isReturned = returnedIds.has(id);
-    const art = ARTIFACTS.find(a => a.id === id);
-    const type = isReturned ? 'home' : 'london';
-    markers[id].setIcon(createIcon(type, isSelected && !isReturned));
-  });
-  
-  // Update selection toolbar
-  const count = selectedIds.size;
-  const countEl = document.getElementById('selectedCount');
-  const hintEl = document.getElementById('selectionHint');
-  
-  if (countEl) {
-    countEl.textContent = count;
-  }
-  if (hintEl) {
-    hintEl.textContent = count === 0 
-      ? 'Click artifacts to select' 
-      : `${count} selected — Shift+Click to range, Cmd+Click to toggle`;
-  }
-  
-  // Update buttons
-  updateButtons();
-}
-
-function updateButtons() {
-  const hasSelection = selectedIds.size > 0;
-  document.getElementById('sendHomeBtn').disabled = !hasSelection;
-  document.getElementById('resetBtn').disabled = returnedIds.size === 0;
-}
-
-// Send selected artifacts home
-function sendSelectedHome() {
-  if (selectedIds.size === 0) return;
-  
-  const btn = document.getElementById('sendHomeBtn');
-  btn.disabled = true;
-  btn.textContent = 'Sending...';
-  
-  // 1) Reset everything back to the museum first
-  returnedIds.clear();
-  ARTIFACTS.forEach(artifact => {
-    markers[artifact.id].setLatLng([LONDON.lat, LONDON.lng]);
-    markers[artifact.id].setIcon(createIcon('london', selectedIds.has(artifact.id)));
-  });
-  updateStats();
-  
-  // 2) Then animate only the currently selected artifacts home
-  const ids = Array.from(selectedIds);
-  
-  ids.forEach((id, index) => {
-    const art = ARTIFACTS.find(a => a.id === id);
-    if (!art) return;
-    
-    setTimeout(() => {
-      const marker = markers[id];
-      const startPos = [LONDON.lat, LONDON.lng];
-      const endPos = [art.lat, art.lng];
-      let progress = 0;
-      const duration = 1200;
-      const startTime = Date.now();
-      
-      function animate() {
-        progress = Math.min(1, (Date.now() - startTime) / duration);
-        const eased = 0.5 - 0.5 * Math.cos(progress * Math.PI);
-        const lat = startPos[0] + (endPos[0] - startPos[0]) * eased;
-        const lng = startPos[1] + (endPos[1] - startPos[1]) * eased;
-        marker.setLatLng([lat, lng]);
-        marker.setIcon(createIcon('between', true));
-        
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          returnedIds.add(id);
-          marker.setIcon(createIcon('home', false));
-          updateStats();
-          refreshSelection();
-        }
+    const layer = L.layerGroup().addTo(map);
+    function render() {
+      const yf = parseInt(document.getElementById('yearFrom').value) || -4000;
+      const yt = parseInt(document.getElementById('yearTo').value) || 2025;
+      const q = (document.getElementById('q').value || '').toLowerCase();
+      let f = ALL.filter((a) => {
+        const okQ = !q || a.name.toLowerCase().includes(q) || a.origin.toLowerCase().includes(q);
+        const y = a.year == null ? 0 : a.year;
+        return okQ && y >= yf && y <= yt;
+      });
+      const total = f.length;
+      if (f.length > MAX_MARKERS) {
+        const step = f.length / MAX_MARKERS, s = [];
+        for (let i = 0; i < f.length; i += step) s.push(f[Math.floor(i)]);
+        f = s.slice(0, MAX_MARKERS);
       }
-      animate();
-    }, index * 200);
-  });
-  
-  setTimeout(() => {
-    btn.disabled = selectedIds.size === 0;
-    btn.textContent = '🏠 Send Selected Home';
-  }, ids.length * 200 + 1400);
-}
+      layer.clearLayers();
+      for (const a of f) {
+        const m = L.marker([a.lat, a.lng], { icon: discIcon(a) });
+        m.bindPopup(() => popupHtml(a), { maxWidth: 250, minWidth: 250 });
+        layer.addLayer(m);
+      }
+      document.getElementById('count').textContent =
+        total > f.length ? `${f.length.toLocaleString()} of ${total.toLocaleString()} in range` : f.length.toLocaleString();
+    }
 
-// Send ALL home
-function sendAllHome() {
-  selectedIds.clear();
-  ARTIFACTS.forEach(a => selectedIds.add(a.id));
-  sendSelectedHome();
-}
-
-// Reset
-function resetToMuseum() {
-  returnedIds.clear();
-  selectedIds.clear();
-  ARTIFACTS.forEach(artifact => {
-    markers[artifact.id].setLatLng([LONDON.lat, LONDON.lng]);
-    markers[artifact.id].setIcon(createIcon('london', false));
-  });
-  refreshSelection();
-  updateStats();
-}
-
-// Update stats
-function updateStats() {
-  document.getElementById('totalCount').textContent = ARTIFACTS.length;
-  document.getElementById('returnedCount').textContent = returnedIds.size;
-}
-
-// Render sidebar list
-function renderList(filterText = '', yearFrom = -4000, yearTo = 1900) {
- const list = document.getElementById('artifactList');
- list.innerHTML = '';
-
- const visible = ARTIFACTS.filter(a => {
- const matchesText = !filterText || 
- a.name.toLowerCase().includes(filterText.toLowerCase()) ||
- a.origin.toLowerCase().includes(filterText.toLowerCase()) ||
- (a.material || '').toLowerCase().includes(filterText.toLowerCase()) ||
- (a.state || '').toLowerCase().includes(filterText.toLowerCase());
- const matchesYear = a.year >= yearFrom && a.year <= yearTo;
- return matchesText && matchesYear;
- });
-  
-  // Reset shift-range anchor to first visible item after filter/search/reset
-  lastClickedIndex = visible.length > 0 ? parseInt(ARTIFACTS.findIndex(a => a.id === visible[0].id)) : null;
-  
-  visible.forEach((artifact, index) => {
-    const item = document.createElement('div');
-    const isSelected = selectedIds.has(artifact.id);
-    const isReturned = returnedIds.has(artifact.id);
-    const isInTrans = isInTransit(artifact.id);
-    
-    item.className = 'artifact-item';
-    if (isSelected) item.classList.add('selected');
-    if (isReturned) item.classList.add('returned');
-    if (isInTrans) item.classList.add('in-transit');
-    
-    item.dataset.id = artifact.id;
-    item.dataset.index = ARTIFACTS.findIndex(a => a.id === artifact.id);
-    
-    item.innerHTML = `
-    <div class="artifact-checkbox">${isSelected ? '✓' : ''}</div>
-    <div class="artifact-thumb">
-      <div style="width:100%;height:100%;${thumbBg(artifact)}"></div>
-    </div>
-    <div class="artifact-info">
-    <div class="artifact-name">${artifact.name}</div>
-    <div class="artifact-origin">${artifact.origin}</div>
-    <div class="artifact-date">${artifact.date_text || (artifact.year !== null ? (artifact.year < 0 ? Math.abs(artifact.year) + ' BC' : artifact.year + ' AD') : 'Unknown')}</div>
-    ${(artifact.state || artifact.description || '') ? `<div class="artifact-state">${artifact.state || artifact.description}</div>` : ''}
-    </div>
-  `;
-    
-    item.onclick = (e) => {
-      e.preventDefault();
-      toggleSelect(artifact.id, parseInt(item.dataset.index));
-    };
-    
-    list.appendChild(item);
-  });
-  
-  updateButtons();
-}
-
-// Event listeners
-document.getElementById('sendHomeBtn').onclick = sendSelectedHome;
-document.getElementById('sendAllBtn').onclick = sendAllHome;
-document.getElementById('resetBtn').onclick = resetToMuseum;
-
-document.getElementById('searchInput').addEventListener('input', (e) => {
-  renderList(e.target.value, yearFrom.value, yearTo.value);
-});
-
-const yearFrom = document.getElementById('yearFrom');
-const yearTo = document.getElementById('yearTo');
-
-yearFrom.addEventListener('change', (e) => {
-  renderList(document.getElementById('searchInput').value, parseInt(e.target.value)||-4000, parseInt(yearTo.value)||1900);
-});
-
-yearTo.addEventListener('change', (e) => {
-  renderList(document.getElementById('searchInput').value, parseInt(yearFrom.value)||-4000, parseInt(e.target.value)||1900);
-});
-
-// Hide instructions after first selection
-const instructionsEl = document.getElementById('instructions');
-function maybeHideInstructions() {
-  if (selectedIds.size > 0 && instructionsEl) {
-    instructionsEl.style.transition = 'opacity 0.5s';
-    instructionsEl.style.opacity = '0';
-    setTimeout(() => instructionsEl.remove(), 500);
-  }
-}
-
-// ---- 5,000-object loader with date filtering (mobile-safe) ----
-const ATLAS_N = 32;
-const MAX_MARKERS = 700; // never overwhelm mobile: cap active markers
-
-function thumbBg(a) {
-  if (!a || !a.atlas) return 'background:#cdbfa6;';
-  const x = a.atlas.u * ATLAS_N / (ATLAS_N - 1) * 100;
-  const y = a.atlas.v * ATLAS_N / (ATLAS_N - 1) * 100;
-  return 'background-image:url(atlas/atlas_' + a.atlas.atlas_index + '.jpg);' +
-         'background-size:' + (ATLAS_N * 100) + '% ' + (ATLAS_N * 100) + '%;' +
-         'background-position:' + x + '% ' + y + '%;background-repeat:no-repeat;';
-}
-
-function clearMarkers() {
-  Object.values(markers).forEach((m) => map.removeLayer(m));
-  markers = {};
-  allIds = [];
-  selectedIds.clear();
-  returnedIds.clear();
-  lastClickedIndex = null;
-}
-
-function applyDateFilter() {
-  const yf = parseInt(document.getElementById('yearFrom').value) || -4000;
-  const yt = parseInt(document.getElementById('yearTo').value) || 1900;
-  const q = (document.getElementById('searchInput').value || '').toLowerCase();
-  let f = ALL.filter((a) => {
-    const okText = !q ||
-      (a.name || '').toLowerCase().includes(q) ||
-      (a.origin || '').toLowerCase().includes(q);
-    const y = (a.year == null ? 0 : a.year);
-    return okText && y >= yf && y <= yt;
-  });
-  // Cap the active set so the map never has to animate thousands at once.
-  if (f.length > MAX_MARKERS) {
-    const step = f.length / MAX_MARKERS;
-    const s2 = [];
-    for (let i = 0; i < f.length; i += step) s2.push(f[Math.floor(i)]);
-    f = s2.slice(0, MAX_MARKERS);
-  }
-  ARTIFACTS = f;
-  clearMarkers();
-  allIds = ARTIFACTS.map((a) => a.id);
-  addMarkers();
-  renderList(document.getElementById('searchInput').value, yf, yt);
-  updateStats();
-}
-
-async function load() {
-  try {
-    const raw = await fetch('artifacts.json').then((r) => r.json());
-    ALL = raw
-      .map((a, i) => ({
-        id: a.bm_id || ('x' + i),
-        bm_id: a.bm_id,
-        name: a.name || 'Object',
-        origin: a.origin || a.origin_country || '',
-        lat: a.lat, lng: a.lng,
-        year: (typeof a.year === 'number' ? a.year : null),
-        material: a.material || '',
-        date_text: a.date_text || '',
-        description: a.description || '',
-        image_url: a.image_url || '',
-        image_source_url: a.image_source_url || '',
-        museum_number: a.museum_number || '',
-        atlas: a.atlas,
-      }))
-      .filter((a) => typeof a.lat === 'number' && typeof a.lng === 'number');
-    applyDateFilter();
-    // Re-filter (rebuild markers) whenever the date or search changes.
     let t;
-    const refilter = () => { clearTimeout(t); t = setTimeout(applyDateFilter, 200); };
-    ['yearFrom', 'yearTo', 'searchInput'].forEach((id) => {
+    const onChange = () => { clearTimeout(t); t = setTimeout(render, 200); };
+    ['yearFrom', 'yearTo', 'q'].forEach((id) => {
       const el = document.getElementById(id);
-      if (el) { el.addEventListener('change', refilter); el.addEventListener('input', refilter); }
+      el.addEventListener('input', onChange);
+      el.addEventListener('change', onChange);
     });
-  } catch (e) {
-    console.error('load failed', e);
-  }
-}
-load();
-</script>
 
+    fetch('artifacts.json').then((r) => r.json()).then((raw) => {
+      ALL = raw
+        .map((a) => ({
+          name: a.name || 'Object', origin: a.origin || a.origin_country || '',
+          lat: a.lat, lng: a.lng, year: typeof a.year === 'number' ? a.year : null,
+          material: a.material || '', date_text: a.date_text || '', description: a.description || '',
+          image_url: a.image_url || '', image_source_url: a.image_source_url || '',
+          museum_number: a.museum_number || '', atlas: a.atlas,
+        }))
+        .filter((a) => typeof a.lat === 'number' && typeof a.lng === 'number' && a.atlas);
+      document.getElementById('loading').remove();
+      render();
+    }).catch((e) => { document.getElementById('loading').textContent = 'Failed to load: ' + e.message; });
+  </script>
 </body>
 </html>
