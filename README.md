@@ -33,7 +33,7 @@ Run it on a Mac with Google Chrome and a Cloudflare-warmed profile,
 reusing an existing Playwright install via `NODE_PATH`:
 
 ```bash
-cd ~/bm-test
+cd <repo>
 BM_PROFILE=/path/to/chrome_data_extractor \
 NODE_PATH=/path/to/british-museum-extractor/node_modules \
 node tools/enrich.mjs --dump Y_EA77434     # 1. check one object

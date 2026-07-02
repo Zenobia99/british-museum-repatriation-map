@@ -1,15 +1,22 @@
-"""Rebuild BM dataset from local harvest cache instead of live SPARQL."""
+"""Rebuild BM dataset from local harvest cache instead of live SPARQL.
+
+Point BM_HARVEST at your harvested_details.jsonl (produced by the harvest
+run described in the README):
+
+    BM_HARVEST=/path/to/harvested_details.jsonl python3 tools/fetch_bm_data.py
+"""
 import json
+import os
 from pathlib import Path
 
-BASE = Path(__file__).resolve().parent
-HARVEST = Path('/Users/davidwaite/.gemini/antigravity/scratch/british-museum-extractor/data/harvested_details.jsonl')
+BASE = Path(__file__).resolve().parent.parent  # repo root
+HARVEST = Path(os.environ.get('BM_HARVEST', ''))
 FINAL = BASE / 'bm_final_artifacts.json'
 
 
 def main() -> None:
-    if not HARVEST.exists():
-        raise SystemExit(f'Missing {HARVEST}')
+    if not os.environ.get('BM_HARVEST') or not HARVEST.exists():
+        raise SystemExit('Set BM_HARVEST to the path of harvested_details.jsonl')
 
     harvested = {}
     for line in HARVEST.read_text().splitlines():
@@ -256,21 +263,21 @@ def main() -> None:
             'origin': 'London, England',
             'material': 'paper',
             'date_text': '2011',
-            'image_url': 'http://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg'
+            'image_url': 'https://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg'
         },
         'A_2011-3040-1-1': {
             'name': 'illustrated book; manga; print',
             'origin': 'Tokyo, Japan',
             'material': 'paper',
             'date_text': 'Heisei Era',
-            'image_url': 'http://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg'
+            'image_url': 'https://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg'
         },
         'A_2011-3040-1-2': {
             'name': 'illustrated book; manga; print',
             'origin': 'Tokyo, Japan',
             'material': 'paper',
             'date_text': 'Heisei Era',
-            'image_url': 'http://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg'
+            'image_url': 'https://media.britishmuseum.org/media/Repository/Documents/2015_5/12_11/14557e2a_2878_4d4b_b9cf_a49600c12688/preview_JCF24435.jpg'
         }
         }
     override_count = 0

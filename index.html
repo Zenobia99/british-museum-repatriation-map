@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Defence-in-depth: no foreign scripts, images, or network beyond the CDNs
+         we actually use. 'unsafe-inline' stays only for the importmap/watchdog
+         inline blocks; tighten to hashes if those ever stabilise. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://media.britishmuseum.org; connect-src 'self' blob: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'none'"
+    />
     <title>Return Them Home — 5,000 British Museum Artefacts</title>
     <link
       rel="icon"
@@ -40,7 +47,7 @@
         }
       }
     </script>
-    <script type="module" src="./app.js?v=89fcd05d2c"></script>
+    <script type="module" src="./app.js?v=b522474f84"></script>
   </head>
   <body>
     <div id="app">

@@ -7,9 +7,9 @@
 //
 // Reuse your already-Cloudflare-warmed profile and existing Playwright install:
 //
-//   cd ~/bm-test
-//   BM_PROFILE=/Users/davidwaite/.gemini/antigravity/scratch/british-museum-extractor/chrome_data_extractor \
-//   NODE_PATH=/Users/davidwaite/.gemini/antigravity/scratch/british-museum-extractor/node_modules \
+//   cd <repo>
+//   BM_PROFILE=/path/to/chrome_data_extractor \
+//   NODE_PATH=/path/to/british-museum-extractor/node_modules \
 //   node tools/enrich.mjs --dump Y_EA77434     # 1. sanity check one object
 //   ...same env... node tools/enrich.mjs --limit 20 --dry   # 2. preview 20
 //   ...same env... node tools/enrich.mjs                     # 3. full run -> writes artifacts.json

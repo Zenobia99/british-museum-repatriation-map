@@ -4,8 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>If All Artifacts Returned Home</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Defence-in-depth: only Leaflet from unpkg may run; images limited to the
+     sources this page actually uses. -->
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://media.britishmuseum.org https://upload.wikimedia.org https://server.arcgisonline.com; connect-src 'self'; object-src 'none'; base-uri 'none'"
+/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   
@@ -537,6 +545,18 @@
 </div>
 
 <script>
+// Escape artefact data before it touches innerHTML: fields come from a
+// scraped pipeline and must render as text, never parse as HTML.
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// For URLs inside inline handlers: JSON-encode (valid JS string literal),
+// then HTML-escape so the attribute parser can't be broken out of.
+const escJs = (s) => esc(JSON.stringify(String(s ?? '')));
+// Image tag with a safe remote fallback; hides itself if neither loads.
+const imgFallback = (url) => url
+  ? `onerror="this.onerror=null;this.src=${escJs(url)}"`
+  : `onerror="this.style.display='none'"`;
+
 const ARTIFACTS = [
 { id: 'GR_1816-0714-1', name: 'Elgin Marbles', origin: 'Greece', lat: 37.97, lng: 23.72, year: null, date_text: '', material: 'Pentelic marble', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Elgin-marbles-jan-2024.jpg/330px-Elgin-marbles-jan-2024.jpg' },
 { id: 'Y_EA24', name: 'Rosetta Stone', origin: 'Egypt: Beheira, el- (Governorate): Rashid, el-: Fort Saint Julien', lat: 31.2, lng: 30.0, year: null, date_text: 'Ptolemaic', material: 'granodiorite', state: '', museum: 'British Museum, London', emoji: '📷', image_url: 'https://media.britishmuseum.org/media/Repository/Documents/2014_9/30_14/850117f8_773c_4b7e_af44_a3b600f6de6d/mid_00016456_004.jpg' },
@@ -838,14 +858,14 @@ function addMarkers() {
     marker.bindPopup(`
       <div class="artifact-popup">
         <div class="popup-image">
-          <img src="./images/${ARTIFACTS.indexOf(artifact) + 1}.jpg?cb=20260602" alt="${artifact.name}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;" onerror="this.onerror=null; this.src='${artifact.image_url || ''}'; this.onerror=this.onerror;">
+          <img src="./images/${ARTIFACTS.indexOf(artifact) + 1}.jpg?cb=20260602" alt="${esc(artifact.name)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;" ${imgFallback(artifact.image_url)}>
         </div>
-        <div class="popup-title">${artifact.name}</div>
+        <div class="popup-title">${esc(artifact.name)}</div>
         <div class="popup-meta">
-        <strong>Origin:</strong> ${artifact.origin}<br>
-        <strong>Date:</strong> ${artifact.date_text || (artifact.year !== null ? (artifact.year < 0 ? Math.abs(artifact.year) + ' BC' : artifact.year + ' AD') : 'Unknown')}<br>
-        <strong>Material:</strong> ${artifact.material}
-        ${(artifact.state || artifact.description || '') ? `<br><strong>State:</strong> ${artifact.state || artifact.description}` : ''}
+        <strong>Origin:</strong> ${esc(artifact.origin)}<br>
+        <strong>Date:</strong> ${esc(artifact.date_text || (artifact.year !== null ? (artifact.year < 0 ? Math.abs(artifact.year) + ' BC' : artifact.year + ' AD') : 'Unknown'))}<br>
+        <strong>Material:</strong> ${esc(artifact.material)}
+        ${(artifact.state || artifact.description || '') ? `<br><strong>State:</strong> ${esc(artifact.state || artifact.description)}` : ''}
         ${isSelected ? '<br><strong style="color:#007aff">Selected</strong>' : ''}
         ${isReturned ? '<br><strong style="color:#2e7d32">Returned home</strong>' : ''}
         </div>
@@ -1099,13 +1119,13 @@ function renderList(filterText = '', yearFrom = -4000, yearTo = 1900) {
     item.innerHTML = `
     <div class="artifact-checkbox">${isSelected ? '✓' : ''}</div>
     <div class="artifact-thumb">
-      <img src="./images/${ARTIFACTS.indexOf(artifact) + 1}.jpg?cb=20260602" alt="${artifact.name}" loading="lazy" onerror="this.onerror=null; this.src='${artifact.image_url || ''}'; this.onerror=this.onerror;" style="width:100%;height:100%;object-fit:cover;display:block;">
+      <img src="./images/${ARTIFACTS.indexOf(artifact) + 1}.jpg?cb=20260602" alt="${esc(artifact.name)}" loading="lazy" ${imgFallback(artifact.image_url)} style="width:100%;height:100%;object-fit:cover;display:block;">
     </div>
     <div class="artifact-info">
-    <div class="artifact-name">${artifact.name}</div>
-    <div class="artifact-origin">${artifact.origin}</div>
-    <div class="artifact-date">${artifact.date_text || (artifact.year !== null ? (artifact.year < 0 ? Math.abs(artifact.year) + ' BC' : artifact.year + ' AD') : 'Unknown')}</div>
-    ${(artifact.state || artifact.description || '') ? `<div class="artifact-state">${artifact.state || artifact.description}</div>` : ''}
+    <div class="artifact-name">${esc(artifact.name)}</div>
+    <div class="artifact-origin">${esc(artifact.origin)}</div>
+    <div class="artifact-date">${esc(artifact.date_text || (artifact.year !== null ? (artifact.year < 0 ? Math.abs(artifact.year) + ' BC' : artifact.year + ' AD') : 'Unknown'))}</div>
+    ${(artifact.state || artifact.description || '') ? `<div class="artifact-state">${esc(artifact.state || artifact.description)}</div>` : ''}
     </div>
   `;
     

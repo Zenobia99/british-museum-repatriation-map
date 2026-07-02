@@ -14,4 +14,5 @@ echo "(new port each run = no stale cache; Ctrl+C to stop)"
 # Open the browser on macOS / Linux if possible.
 ( sleep 1; (command -v open >/dev/null && open "$url") || (command -v xdg-open >/dev/null && xdg-open "$url") || true ) &
 
-exec python3 -m http.server "$port"
+# Bind loopback only — this serves the whole repo; keep it off the LAN.
+exec python3 -m http.server "$port" -b 127.0.0.1

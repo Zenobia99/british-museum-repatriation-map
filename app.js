@@ -13,9 +13,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import * as topojson from 'topojson-client';
 
 window.__appJsLoaded = true; // checked by the boot watchdog in index.html
@@ -224,7 +221,9 @@ async function main() {
     setTimeout(() => {
       if (ctxLostAt && !SAFE && !sessionStorage.getItem('bm-safe-retry')) {
         sessionStorage.setItem('bm-safe-retry', '1');
-        location.replace(location.pathname + '?safe=1');
+        const qs = new URLSearchParams(location.search);
+        qs.set('safe', '1');
+        location.replace(location.pathname + '?' + qs);
       }
     }, 6000);
   });
@@ -380,7 +379,6 @@ async function main() {
 
   // Vector country borders — crisp at any zoom (no pixelation), bright enough
   // to read on land and sea so countries are identifiable. Never fatal.
-  let borderMat = null;
   try {
     const mesh = topojson.mesh(world, world.objects.countries);
     const verts = [];
@@ -408,10 +406,6 @@ async function main() {
   } catch (e) {
     console.warn('borders skipped:', e);
   }
-
-  // Country labels disabled — borders alone carry the geography.
-  const labelGroup = new THREE.Group();
-  const labelDirs = [];
 
   // Starfield
   {
@@ -491,7 +485,9 @@ async function main() {
       );
       homePos.set([tmp.x, tmp.y, tmp.z], i * 3);
       const y = parseAcqYear(a.museum_number);
-      acqYears[i] = y ?? 1880 + Math.floor(rng() * 60);
+      // Undated objects sort to the end of the take run so the year ticker
+      // never fabricates a date for them.
+      acqYears[i] = y ?? Infinity;
     }
   }
 
@@ -509,6 +505,7 @@ async function main() {
   byDist.forEach((idx, rank) => (ordReturn[idx] = rank / (N - 1)));
   byYear.forEach((idx, rank) => (ordTake[idx] = rank / (N - 1)));
   const acqSorted = byYear.map((i) => acqYears[i]);
+  const knownYearCount = acqSorted.filter(Number.isFinite).length;
 
   // Shared animation uniforms (one object, referenced by every material)
   const anim = {
@@ -919,10 +916,17 @@ async function main() {
     hovered = best;
     if (best >= 0) {
       const a = artifacts[best];
-      tip.innerHTML = `<b>${a.name}</b><span>${a.origin_country || a.origin}${a.date_text ? ' · ' + a.date_text : ''}</span>`;
-      tip.style.left = `${pointer.x}px`;
-      tip.style.top = `${pointer.y}px`;
+      // Built with textContent, never innerHTML: artefact fields come from a
+      // scraped pipeline and must not be parsed as HTML.
+      const name = document.createElement('b');
+      name.textContent = a.name;
+      const meta = document.createElement('span');
+      meta.textContent = (a.origin_country || a.origin) + (a.date_text ? ' · ' + a.date_text : '');
+      tip.replaceChildren(name, meta);
       tip.hidden = false;
+      const half = tip.offsetHeight / 2 + 8;
+      tip.style.left = `${Math.min(pointer.x, innerWidth - tip.offsetWidth - 20)}px`;
+      tip.style.top = `${THREE.MathUtils.clamp(pointer.y, half, innerHeight - half)}px`;
       renderer.domElement.style.cursor = 'pointer';
     } else {
       tip.hidden = true;
@@ -936,12 +940,13 @@ async function main() {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
-    if (borderMat) borderMat.resolution.set(innerWidth, innerHeight);
   });
 
   const clock = new THREE.Clock();
   setPhase('museum');
   $('boot').classList.add('gone');
+  // Booted cleanly — re-arm the automatic safe-mode retry for any future loss.
+  sessionStorage.removeItem('bm-safe-retry');
   // We reached the render loop, so WebGL is fine — guarantee the fallback
   // card is hidden regardless of any earlier state.
   $('fallback').hidden = true;
@@ -972,7 +977,11 @@ async function main() {
       if (phase === 'returning') {
         tickerBig.textContent = k.toLocaleString();
       } else {
-        tickerBig.textContent = k > 0 ? String(Math.round(acqSorted[k - 1])) : String(Math.round(acqSorted[0]));
+        // Clamp to the last dated object: undated ones fly at the end and
+        // must not show as a made-up year.
+        const ki = Math.min(k, knownYearCount);
+        tickerBig.textContent = ki > 0 ? String(Math.round(acqSorted[ki - 1]))
+          : knownYearCount > 0 ? String(Math.round(acqSorted[0])) : '—';
       }
       if (raw >= 1) {
         if (phase === 'returning') {
@@ -1000,20 +1009,6 @@ async function main() {
 
     controls.autoRotate = wantRotate && (phase === 'home' || phase === 'returning') && !pointer.downAt;
     controls.update();
-
-    // Country labels: only when zoomed in past the overview, and only on the
-    // near hemisphere (keeps the global view uncluttered, regional views legible).
-    if (labelGroup.children.length) {
-      const camLen = camera.position.length();
-      const show = camLen < 245;
-      labelGroup.visible = show;
-      if (show) {
-        const camDir = camera.position.clone().normalize();
-        for (let i = 0; i < labelDirs.length; i++) {
-          labelGroup.children[i].visible = labelDirs[i].dot(camDir) > 0.32;
-        }
-      }
-    }
 
     if (pointer.moved) { pointer.moved = false; pick(); }
 
